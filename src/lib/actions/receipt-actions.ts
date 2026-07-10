@@ -7,6 +7,14 @@ import { requireParentChild, requireTrainer } from "@/lib/auth";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
+const ALLOWED_RECEIPT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "application/pdf",
+];
+
 export async function uploadReceiptAction(
   _prevState: ActionState,
   formData: FormData,
@@ -15,7 +23,10 @@ export async function uploadReceiptAction(
 
   const file = formData.get("receipt");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Выберите файл с фото или скриншотом чека" };
+    return { error: "Выберите файл с фото, скриншотом или PDF чека" };
+  }
+  if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
+    return { error: "Поддерживаются только изображения (JPG, PNG) и PDF" };
   }
 
   const month = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -28,7 +39,7 @@ export async function uploadReceiptAction(
   const blob = await put(key, file, { access: "private" });
 
   await prisma.paymentReceipt.create({
-    data: { childId: child.id, fileUrl: blob.url },
+    data: { childId: child.id, fileUrl: blob.url, contentType: file.type },
   });
 
   revalidatePath("/trainer/children");

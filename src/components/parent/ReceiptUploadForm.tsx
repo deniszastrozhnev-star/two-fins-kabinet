@@ -19,10 +19,11 @@ export function ReceiptUploadForm() {
       <input
         type="file"
         name="receipt"
-        accept="image/*"
+        accept="image/*,application/pdf"
         required
         className="text-sm text-brand-text/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-text hover:file:bg-white/15"
       />
+      <p className="text-xs text-brand-text/50">Фото, скриншот или PDF-чек из банка</p>
       {state?.error && (
         <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
           {state.error}

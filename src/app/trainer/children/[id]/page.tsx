@@ -118,24 +118,43 @@ export default async function ChildDetailPage({
                   Чеки об оплате
                 </h2>
                 <ul className="flex flex-col divide-y divide-white/10">
-                  {receipts.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center justify-between py-2 text-sm"
-                    >
-                      <span className="text-brand-text/70">
-                        {formatDateRu(r.createdAt)}
-                      </span>
-                      <a
-                        href={`/api/receipts/${r.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-cyan hover:underline"
-                      >
-                        Посмотреть чек →
-                      </a>
-                    </li>
-                  ))}
+                  {receipts.map((r) => {
+                    const isImage = r.contentType?.startsWith("image/");
+                    return (
+                      <li key={r.id} className="flex items-center gap-3 py-2">
+                        <a
+                          href={`/api/receipts/${r.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0"
+                        >
+                          {isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`/api/receipts/${r.id}`}
+                              alt="Превью чека"
+                              className="h-12 w-12 rounded-lg border border-white/10 object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-brand-text/60">
+                              PDF
+                            </span>
+                          )}
+                        </a>
+                        <span className="flex-1 text-sm text-brand-text/70">
+                          {formatDateRu(r.createdAt)}
+                        </span>
+                        <a
+                          href={`/api/receipts/${r.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-brand-cyan hover:underline"
+                        >
+                          {isImage ? "Открыть →" : "Открыть PDF →"}
+                        </a>
+                      </li>
+                    );
+                  })}
                 </ul>
               </CardBody>
             </Card>

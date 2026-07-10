@@ -115,12 +115,13 @@ model PersonalTraining {
 }
 
 model PaymentReceipt {
-  id        String    @id @default(cuid())
-  childId   String
-  child     Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
-  fileUrl   String
-  createdAt DateTime  @default(now())
-  viewedAt  DateTime?
+  id          String    @id @default(cuid())
+  childId     String
+  child       Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  contentType String? // image/jpeg, image/png, application/pdf и т.д. — для выбора превью/иконки
+  createdAt   DateTime  @default(now())
+  viewedAt    DateTime?
 
   @@index([childId])
 }

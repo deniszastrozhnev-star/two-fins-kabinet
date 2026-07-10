@@ -52,7 +52,7 @@ export function TrainerShell({
               href={link.href}
               exact={link.exact}
               className="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition"
-              activeClassName="bg-brand-cyan/20 text-brand-cyan"
+              activeClassName="-translate-y-px bg-brand-cyan/20 text-brand-cyan shadow-[0_4px_14px_-4px_rgba(41,211,224,0.55)] ring-1 ring-inset ring-brand-cyan/30"
               inactiveClassName="text-brand-text/60 hover:bg-white/5 hover:text-brand-text"
             >
               {link.label}

@@ -39,7 +39,7 @@ export function ParentShell({
               href={link.href}
               exact={link.exact}
               className="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition"
-              activeClassName="bg-brand-cyan/20 text-brand-cyan"
+              activeClassName="-translate-y-px bg-brand-cyan/20 text-brand-cyan shadow-[0_4px_14px_-4px_rgba(41,211,224,0.55)] ring-1 ring-inset ring-brand-cyan/30"
               inactiveClassName="text-brand-text/60 hover:bg-white/5 hover:text-brand-text"
             >
               {link.label}
@@ -59,8 +59,8 @@ export function ParentShell({
               key={link.href}
               href={link.href}
               exact={link.exact}
-              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition"
-              activeClassName="text-brand-cyan"
+              className="mx-1 my-1.5 flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition"
+              activeClassName="bg-brand-cyan/15 text-brand-cyan shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)]"
               inactiveClassName="text-brand-text/50"
             >
               {link.label}
