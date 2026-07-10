@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "C:\\Users\\Two Fins\\Desktop\\TwoFinsKabinet\\.claude\\dev-with-node.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}

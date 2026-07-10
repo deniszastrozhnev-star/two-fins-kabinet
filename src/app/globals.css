@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-base: #041e3d;
+  --color-brand-blue: #0b4f86;
+  --color-brand-cyan: #29d3e0;
+  --color-brand-violet: #5b7fff;
+  --color-brand-text: #f0f6fa;
+
+  --font-heading: "Comic Sans MS", "Comic Sans", cursive;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--color-brand-base);
+  color: var(--color-brand-text);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+}
+
+/* Мягкий переливающийся фон — только для декоративного слоя, не влияет на текст */
+.brand-shimmer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.brand-shimmer::before,
+.brand-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(
+      circle at 15% 20%,
+      var(--color-brand-blue) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 85% 15%,
+      var(--color-brand-violet) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 50% 90%,
+      var(--color-brand-cyan) 0%,
+      transparent 40%
+    );
+  filter: blur(80px);
+  opacity: 0.4;
+  animation: brand-shimmer-move 22s ease-in-out infinite alternate;
+}
+
+.brand-shimmer::after {
+  animation-duration: 30s;
+  animation-direction: alternate-reverse;
+  opacity: 0.25;
+}
+
+@keyframes brand-shimmer-move {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-4%, 3%, 0) scale(1.1);
+  }
+  100% {
+    transform: translate3d(3%, -4%, 0) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-shimmer::before,
+  .brand-shimmer::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Trainer {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum GroupLevel {
+  NOVICE // Новичок
+  CONFIDENT // Уверенный пловец
+  SPORT // Спортивный уровень
+  TEAM // Сборная школы
+}
+
+model Group {
+  id         String   @id @default(cuid())
+  name       String
+  level      GroupLevel
+  daysOfWeek String[] // напр. ["Пн", "Ср", "Пт"]
+  time       String // напр. "17:00–17:45"
+  pool       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  children          Child[]
+  attendanceRecords AttendanceRecord[] @relation("SessionGroup")
+  workoffCloses     AttendanceRecord[] @relation("WorkoffClosesGroup")
+}
+
+model Child {
+  id           String   @id @default(cuid())
+  lastName     String
+  firstName    String
+  groupId      String?
+  group        Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentPhone  String // хранится нормализованным (только цифры)
+  paidUntil    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attendanceRecords AttendanceRecord[]
+  eventSignups      EventSignup[]
+
+  @@index([groupId])
+  @@index([parentPhone])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  WORKOFF
+}
+
+model AttendanceRecord {
+  id        String            @id @default(cuid())
+  childId   String
+  child     Child             @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group             @relation("SessionGroup", fields: [groupId], references: [id], onDelete: Cascade)
+  date      DateTime          @db.Date
+  status    AttendanceStatus
+  // Если status = WORKOFF: какая группа/пропуск "закрывается" этой отработкой (для истории, не участвует в подсчёте остатка)
+  workoffClosesGroupId String?
+  workoffClosesGroup    Group?  @relation("WorkoffClosesGroup", fields: [workoffClosesGroupId], references: [id], onDelete: SetNull)
+  createdAt DateTime          @default(now())
+
+  @@index([childId])
+  @@index([groupId, date])
+  @@unique([childId, groupId, date])
+}
+
+enum EventType {
+  NEWS
+  GATHERING
+  COMPETITION
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  type        EventType
+  dateStart   DateTime
+  dateEnd     DateTime?
+  location    String
+  description String
+  suitableFor String // напр. "8-10 лет, Уверенный пловец"
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  signups EventSignup[]
+}
+
+model EventSignup {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, childId])
+}
