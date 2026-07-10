@@ -6,12 +6,21 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TrainerRole {
+  HEAD // главный тренер — видит отчёт и зарплаты всех
+  TRAINER
+}
+
 model Trainer {
-  id           String   @id @default(cuid())
-  username     String   @unique
+  id           String      @id @default(cuid())
+  username     String      @unique
   passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         TrainerRole @default(TRAINER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  attendanceRecords AttendanceRecord[]
+  personalTrainings PersonalTraining[]
 }
 
 enum GroupLevel {
@@ -49,6 +58,8 @@ model Child {
 
   attendanceRecords AttendanceRecord[]
   eventSignups      EventSignup[]
+  personalTrainings PersonalTraining[]
+  paymentReceipts   PaymentReceipt[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -71,11 +82,47 @@ model AttendanceRecord {
   // Если status = WORKOFF: какая группа/пропуск "закрывается" этой отработкой (для истории, не участвует в подсчёте остатка)
   workoffClosesGroupId String?
   workoffClosesGroup    Group?  @relation("WorkoffClosesGroup", fields: [workoffClosesGroupId], references: [id], onDelete: SetNull)
+  // Тренер, который поставил эту отметку — используется для расчёта зарплаты
+  markedByTrainerId String
+  markedByTrainer   Trainer  @relation(fields: [markedByTrainerId], references: [id])
   createdAt DateTime          @default(now())
 
   @@index([childId])
   @@index([groupId, date])
+  @@index([markedByTrainerId, date])
   @@unique([childId, groupId, date])
+}
+
+enum PersonType {
+  CHILD
+  ADULT
+}
+
+model PersonalTraining {
+  id         String     @id @default(cuid())
+  trainerId  String
+  trainer    Trainer    @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  date       DateTime   @db.Date
+  time       String // напр. "18:00"
+  personType PersonType
+  childId    String?
+  child      Child?     @relation(fields: [childId], references: [id], onDelete: SetNull)
+  adultName  String? // ФИО взрослого, если personType = ADULT
+  completed  Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  @@index([trainerId, date])
+}
+
+model PaymentReceipt {
+  id        String    @id @default(cuid())
+  childId   String
+  child     Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  fileUrl   String
+  createdAt DateTime  @default(now())
+  viewedAt  DateTime?
+
+  @@index([childId])
 }
 
 enum EventType {

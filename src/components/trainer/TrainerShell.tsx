@@ -2,17 +2,31 @@ import { NavLink } from "@/components/NavLink";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/Button";
 
-const LINKS = [
+type NavLinkDef = { href: string; label: string; exact?: boolean };
+
+const BASE_LINKS: NavLinkDef[] = [
   { href: "/trainer", label: "Обзор", exact: true },
   { href: "/trainer/attendance", label: "Посещаемость" },
   { href: "/trainer/children", label: "Дети" },
   { href: "/trainer/schedule", label: "Расписание" },
-  { href: "/trainer/workoffs", label: "Отработки" },
+  { href: "/trainer/personal-trainings", label: "Персональные тренировки" },
   { href: "/trainer/events", label: "Новости и события" },
   { href: "/trainer/settings", label: "Настройки" },
 ];
 
-export function TrainerShell({ children }: { children: React.ReactNode }) {
+const HEAD_ONLY_LINKS: NavLinkDef[] = [
+  { href: "/trainer/team", label: "Тренеры" },
+  { href: "/trainer/report", label: "Отчёт" },
+];
+
+export function TrainerShell({
+  children,
+  isHead,
+}: {
+  children: React.ReactNode;
+  isHead: boolean;
+}) {
+  const LINKS = isHead ? [...BASE_LINKS, ...HEAD_ONLY_LINKS] : BASE_LINKS;
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-white/10 bg-brand-base/70 backdrop-blur-md sticky top-0 z-20">

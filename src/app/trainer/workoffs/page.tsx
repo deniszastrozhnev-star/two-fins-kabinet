@@ -3,6 +3,7 @@ import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
 import { getWorkoffBalances } from "@/lib/workoffs";
 import { saveWorkoffAttendanceAction } from "@/lib/actions/workoff-actions";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -15,10 +16,16 @@ import { SaveButton } from "@/components/trainer/SaveButton";
 export default async function WorkoffsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ groupId?: string; date?: string; q?: string }>;
+  searchParams: Promise<{
+    groupId?: string;
+    date?: string;
+    q?: string;
+    back?: string;
+  }>;
 }) {
   await requireTrainer();
   const params = await searchParams;
+  const back = params.back ?? "";
 
   const groups = await prisma.group.findMany({
     orderBy: [{ level: "asc" }, { name: "asc" }],
@@ -70,8 +77,18 @@ export default async function WorkoffsPage({
   return (
     <>
       <PageHeader
-        title="Отработки"
+        title="Отработка"
         description="Выберите занятие, куда пришли дети на отработку, и найдите их по имени — из любой группы школы"
+        action={
+          back === "attendance" ? (
+            <Link
+              href={`/trainer/attendance?groupId=${groupId}&date=${dateStr}`}
+              className="text-sm text-brand-cyan hover:underline"
+            >
+              ← Назад к посещаемости
+            </Link>
+          ) : undefined
+        }
       />
 
       <Card className="mb-4">
@@ -81,7 +98,7 @@ export default async function WorkoffsPage({
             groups={groups}
             groupId={groupId}
             date={dateStr}
-            extraHidden={{ q }}
+            extraHidden={{ q, back }}
           />
         </CardBody>
       </Card>
@@ -91,7 +108,7 @@ export default async function WorkoffsPage({
           action="/trainer/workoffs"
           defaultValue={q}
           placeholder="Поиск ребёнка по имени…"
-          extraHidden={{ groupId, date: dateStr }}
+          extraHidden={{ groupId, date: dateStr, back }}
         />
       </div>
 
@@ -101,6 +118,7 @@ export default async function WorkoffsPage({
         <form action={saveWorkoffAttendanceAction}>
           <input type="hidden" name="groupId" value={groupId} />
           <input type="hidden" name="date" value={dateStr} />
+          <input type="hidden" name="back" value={back} />
           <Card>
             <CardBody className="flex flex-col divide-y divide-white/10 p-0">
               {children.map((child) => {

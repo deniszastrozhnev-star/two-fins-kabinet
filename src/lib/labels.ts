@@ -1,4 +1,9 @@
-import type { AttendanceStatus, EventType, GroupLevel } from "@prisma/client";
+import type {
+  AttendanceStatus,
+  EventType,
+  GroupLevel,
+  TrainerRole,
+} from "@prisma/client";
 
 export const LEVEL_LABELS: Record<GroupLevel, string> = {
   NOVICE: "Новичок",
@@ -22,3 +27,8 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
 };
 
 export const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
+
+export const TRAINER_ROLE_LABELS: Record<TrainerRole, string> = {
+  HEAD: "Главный тренер",
+  TRAINER: "Тренер",
+};

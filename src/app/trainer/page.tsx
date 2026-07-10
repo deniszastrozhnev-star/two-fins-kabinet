@@ -9,7 +9,11 @@ const QUICK_LINKS = [
   { href: "/trainer/attendance", label: "Посещаемость", desc: "Отметить занятие" },
   { href: "/trainer/children", label: "Дети", desc: "Список и оплата" },
   { href: "/trainer/schedule", label: "Расписание", desc: "Группы и переносы" },
-  { href: "/trainer/workoffs", label: "Отработки", desc: "Кто пришёл сегодня" },
+  {
+    href: "/trainer/personal-trainings",
+    label: "Персональные тренировки",
+    desc: "Добавить занятие",
+  },
   { href: "/trainer/events", label: "Новости и события", desc: "Сборы, соревнования" },
 ];
 

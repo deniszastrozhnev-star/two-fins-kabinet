@@ -16,7 +16,7 @@ const VALID_STATUSES: AttendanceStatus[] = ["PRESENT", "ABSENT", "WORKOFF"];
  * группы ребёнка на сервере, а не от клиента.
  */
 export async function saveAttendanceAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
 
   const groupId = String(formData.get("groupId") ?? "");
   const dateStr = String(formData.get("date") ?? "");
@@ -44,8 +44,15 @@ export async function saveAttendanceAction(formData: FormData) {
 
       return prisma.attendanceRecord.upsert({
         where: { childId_groupId_date: { childId, groupId, date } },
-        create: { childId, groupId, date, status, workoffClosesGroupId },
-        update: { status, workoffClosesGroupId },
+        create: {
+          childId,
+          groupId,
+          date,
+          status,
+          workoffClosesGroupId,
+          markedByTrainerId: trainer.id,
+        },
+        update: { status, workoffClosesGroupId, markedByTrainerId: trainer.id },
       });
     }),
   );

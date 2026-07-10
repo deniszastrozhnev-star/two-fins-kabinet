@@ -14,10 +14,10 @@ async function main() {
 
   await prisma.trainer.upsert({
     where: { username },
-    update: {},
-    create: { username, passwordHash },
+    update: { role: "HEAD" },
+    create: { username, passwordHash, role: "HEAD" },
   });
-  console.log(`Тренер "${username}" готов.`);
+  console.log(`Главный тренер "${username}" готов.`);
 
   const groupData = [
     {

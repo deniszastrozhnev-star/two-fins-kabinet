@@ -9,6 +9,7 @@ import {
   markPaidAction,
   deleteChildAction,
 } from "@/lib/actions/child-actions";
+import { markLatestReceiptViewed } from "@/lib/actions/receipt-actions";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -28,7 +29,9 @@ export default async function ChildDetailPage({
   const child = await prisma.child.findUnique({ where: { id } });
   if (!child) notFound();
 
-  const [groups, balance, history] = await Promise.all([
+  await markLatestReceiptViewed(id);
+
+  const [groups, balance, history, receipts] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
       select: { id: true, name: true },
@@ -39,6 +42,11 @@ export default async function ChildDetailPage({
       orderBy: { date: "desc" },
       take: 20,
       include: { group: true },
+    }),
+    prisma.paymentReceipt.findMany({
+      where: { childId: id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
     }),
   ]);
 
@@ -102,6 +110,36 @@ export default async function ChildDetailPage({
               </div>
             </CardBody>
           </Card>
+
+          {receipts.length > 0 && (
+            <Card>
+              <CardBody>
+                <h2 className="mb-3 font-heading text-lg font-bold">
+                  Чеки об оплате
+                </h2>
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {receipts.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center justify-between py-2 text-sm"
+                    >
+                      <span className="text-brand-text/70">
+                        {formatDateRu(r.createdAt)}
+                      </span>
+                      <a
+                        href={`/api/receipts/${r.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-cyan hover:underline"
+                      >
+                        Посмотреть чек →
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          )}
 
           <Card>
             <CardBody>

@@ -26,7 +26,6 @@ export default async function ParentCalendarPage({
   const monthDate = month
     ? parse(month, "yyyy-MM", new Date())
     : new Date();
-  const monthKey = format(monthDate, "yyyy-MM");
   const prevMonthKey = format(addMonths(monthDate, -1), "yyyy-MM");
   const nextMonthKey = format(addMonths(monthDate, 1), "yyyy-MM");
 

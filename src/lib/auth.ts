@@ -47,6 +47,15 @@ export async function requireTrainer() {
   return trainer;
 }
 
+/** Требует сессию ГЛАВНОГО тренера; обычного тренера редиректит на /trainer. Возвращает данные тренера. */
+export async function requireHeadTrainer() {
+  const trainer = await requireTrainer();
+  if (trainer.role !== "HEAD") {
+    redirect("/trainer");
+  }
+  return trainer;
+}
+
 /** Требует сессию родителя в Server Component/Action; иначе редиректит на /parent-login. Возвращает ребёнка. */
 export async function requireParentChild() {
   const session = await getSession();

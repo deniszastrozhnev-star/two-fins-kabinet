@@ -6,6 +6,10 @@ import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
+
+const SBP_LINK =
+  "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
 export default async function ParentOverviewPage() {
   const child = await requireParentChild();
@@ -51,6 +55,38 @@ export default async function ParentOverviewPage() {
                 ? "Посмотрите, куда прийти, на вкладке «Отработки»"
                 : "Пропущенных занятий, требующих отработки, нет"}
             </p>
+          </CardBody>
+        </Card>
+
+        <Card className="sm:col-span-2">
+          <CardBody>
+            <p className="text-sm text-brand-text/60">Оплата занятий</p>
+            <div className="mt-3 flex flex-wrap items-start gap-6">
+              <div className="flex flex-col gap-3">
+                <a
+                  href={SBP_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-cyan px-4 py-2.5 text-sm font-semibold text-brand-base transition hover:brightness-110"
+                >
+                  Оплатить через СБП
+                </a>
+                <div className="max-w-sm">
+                  <ReceiptUploadForm />
+                </div>
+              </div>
+              <div className="text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/sbp-qr.png"
+                  alt="QR-код для оплаты через СБП"
+                  className="h-32 w-32 rounded-lg bg-white p-1"
+                />
+                <p className="mt-1.5 text-xs text-brand-text/50">
+                  или отсканируйте QR-код
+                </p>
+              </div>
+            </div>
           </CardBody>
         </Card>
       </div>

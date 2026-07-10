@@ -32,7 +32,14 @@ export default async function ChildrenPage({
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
-  const balances = await getWorkoffBalances(children.map((c) => c.id));
+  const [balances, unviewedReceipts] = await Promise.all([
+    getWorkoffBalances(children.map((c) => c.id)),
+    prisma.paymentReceipt.findMany({
+      where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
+      select: { childId: true },
+    }),
+  ]);
+  const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
 
   return (
     <>
@@ -82,6 +89,9 @@ export default async function ChildrenPage({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {childrenWithNewReceipt.has(child.id) && (
+                      <Badge tone="violet">есть чек</Badge>
+                    )}
                     {balance > 0 && (
                       <Badge tone="amber">{balance} отраб.</Badge>
                     )}

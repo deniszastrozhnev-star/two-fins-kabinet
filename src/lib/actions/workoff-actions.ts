@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
@@ -12,7 +13,7 @@ import { parseDateInputValue } from "@/lib/dates";
  * Снятые с отметки (были WORKOFF, но галочку убрали) — запись удаляется.
  */
 export async function saveWorkoffAttendanceAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
 
   const groupId = String(formData.get("groupId") ?? "");
   const dateStr = String(formData.get("date") ?? "");
@@ -53,10 +54,12 @@ export async function saveWorkoffAttendanceAction(formData: FormData) {
             date,
             status: "WORKOFF",
             workoffClosesGroupId: homeGroupById.get(childId) ?? groupId,
+            markedByTrainerId: trainer.id,
           },
           update: {
             status: "WORKOFF",
             workoffClosesGroupId: homeGroupById.get(childId) ?? groupId,
+            markedByTrainerId: trainer.id,
           },
         }),
       ),
@@ -67,4 +70,9 @@ export async function saveWorkoffAttendanceAction(formData: FormData) {
   revalidatePath("/trainer/attendance");
   revalidatePath("/trainer/children");
   revalidatePath("/parent", "layout");
+
+  const back = String(formData.get("back") ?? "");
+  if (back === "attendance") {
+    redirect(`/trainer/attendance?groupId=${groupId}&date=${dateStr}`);
+  }
 }
