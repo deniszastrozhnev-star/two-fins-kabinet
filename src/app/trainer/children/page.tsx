@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { getWorkoffBalances } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
+import { getMedicalStatus } from "@/lib/medical";
 import { formatPhone } from "@/lib/phone";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -32,14 +33,25 @@ export default async function ChildrenPage({
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
-  const [balances, unviewedReceipts] = await Promise.all([
+  const [balances, unviewedReceipts, certificates] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
       select: { childId: true },
     }),
+    prisma.medicalCertificate.findMany({
+      where: { childId: { in: children.map((c) => c.id) } },
+      orderBy: { createdAt: "desc" },
+      select: { childId: true, validUntil: true },
+    }),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
+  const latestValidUntilByChild = new Map<string, Date>();
+  for (const cert of certificates) {
+    if (!latestValidUntilByChild.has(cert.childId)) {
+      latestValidUntilByChild.set(cert.childId, cert.validUntil);
+    }
+  }
 
   return (
     <>
@@ -73,6 +85,9 @@ export default async function ChildrenPage({
             {children.map((child) => {
               const payment = getPaymentStatus(child.paidUntil);
               const balance = balances.get(child.id) ?? 0;
+              const medical = getMedicalStatus(
+                latestValidUntilByChild.get(child.id) ?? null,
+              );
               return (
                 <Link
                   key={child.id}
@@ -89,8 +104,14 @@ export default async function ChildrenPage({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {child.status === "SICK" && (
+                      <Badge tone="violet">болеет</Badge>
+                    )}
                     {childrenWithNewReceipt.has(child.id) && (
                       <Badge tone="violet">есть чек</Badge>
+                    )}
+                    {(medical.tone === "amber" || medical.tone === "red") && (
+                      <Badge tone={medical.tone}>{medical.label}</Badge>
                     )}
                     {balance > 0 && (
                       <Badge tone="amber">{balance} отраб.</Badge>

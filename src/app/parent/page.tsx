@@ -1,22 +1,34 @@
+import { prisma } from "@/lib/prisma";
 import { requireParentChild } from "@/lib/auth";
 import { getWorkoffBalance } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
+import { getMedicalStatus } from "@/lib/medical";
 import { formatDateRu } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
+import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
 
 const SBP_LINK =
   "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
 export default async function ParentOverviewPage() {
   const child = await requireParentChild();
-  const [balance, payment] = await Promise.all([
+  const [balance, payment, latestCertificate, results] = await Promise.all([
     getWorkoffBalance(child.id),
     Promise.resolve(getPaymentStatus(child.paidUntil)),
+    prisma.medicalCertificate.findFirst({
+      where: { childId: child.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.competitionResult.findMany({
+      where: { childId: child.id },
+      orderBy: { date: "desc" },
+    }),
   ]);
+  const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
 
   return (
     <>
@@ -89,6 +101,50 @@ export default async function ParentOverviewPage() {
             </div>
           </CardBody>
         </Card>
+
+        <Card className="sm:col-span-2">
+          <CardBody>
+            <p className="text-sm text-brand-text/60">Медицинские документы</p>
+            <div className="mt-2">
+              {latestCertificate ? (
+                <p className="text-sm text-brand-text/70">
+                  Анализы действительны до{" "}
+                  {formatDateRu(latestCertificate.validUntil)}
+                </p>
+              ) : (
+                <p className="text-sm text-brand-text/50">
+                  Справка ещё не загружена
+                </p>
+              )}
+              <Badge tone={medicalStatus.tone} className="mt-2">
+                {medicalStatus.label}
+              </Badge>
+            </div>
+            <div className="mt-4 max-w-sm border-t border-white/10 pt-4">
+              <MedicalCertificateUpload />
+            </div>
+          </CardBody>
+        </Card>
+
+        {results.length > 0 && (
+          <Card className="sm:col-span-2">
+            <CardBody>
+              <p className="mb-2 text-sm text-brand-text/60">
+                Результаты соревнований
+              </p>
+              <ul className="flex flex-col divide-y divide-white/10">
+                {results.map((r) => (
+                  <li key={r.id} className="py-2">
+                    <p className="text-sm font-medium">{r.competitionName}</p>
+                    <p className="text-xs text-brand-text/50">
+                      {formatDateRu(r.date)} · {r.result}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        )}
       </div>
     </>
   );

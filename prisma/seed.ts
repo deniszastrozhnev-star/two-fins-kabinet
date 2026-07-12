@@ -26,6 +26,7 @@ async function main() {
       daysOfWeek: ["Пн", "Ср"],
       time: "20:30-21:30",
       pool: "Лазурный",
+      pricePerMonth: 6800,
     },
     {
       name: "Вт, Чт 20:30-21:30",
@@ -33,6 +34,7 @@ async function main() {
       daysOfWeek: ["Вт", "Чт"],
       time: "20:30-21:30",
       pool: "Лазурный",
+      pricePerMonth: 6800,
     },
     {
       name: "Сб 11:00-12:00",
@@ -40,6 +42,7 @@ async function main() {
       daysOfWeek: ["Сб"],
       time: "11:00-12:00",
       pool: "Лазурный (малая чаша, 6-8 лет)",
+      pricePerMonth: 3600,
     },
     {
       name: "Сб 12:00-13:00",
@@ -47,6 +50,7 @@ async function main() {
       daysOfWeek: ["Сб"],
       time: "12:00-13:00",
       pool: "Лазурный",
+      pricePerMonth: 3600,
     },
     {
       name: "Сб, Вс 12:50-13:50",
@@ -54,6 +58,7 @@ async function main() {
       daysOfWeek: ["Сб", "Вс"],
       time: "12:50-13:50",
       pool: "Лазурный",
+      pricePerMonth: 6800,
     },
     {
       name: "Вс 10:30-11:30",
@@ -61,6 +66,7 @@ async function main() {
       daysOfWeek: ["Вс"],
       time: "10:30-11:30",
       pool: "Лазурный (малая чаша, 6-8 лет)",
+      pricePerMonth: 3600,
     },
     {
       name: "Вс 12:00-13:00",
@@ -68,28 +74,35 @@ async function main() {
       daysOfWeek: ["Вс"],
       time: "12:00-13:00",
       pool: "Лазурный",
+      pricePerMonth: 3600,
     },
     {
-      name: "Пн, Пт 19:45-20:45",
+      name: "Пн, Пт 19:45-20:45 (Олимпик)",
       level: "CONFIDENT" as const,
       daysOfWeek: ["Пн", "Пт"],
       time: "19:45-20:45",
       pool: "Олимпик",
+      pricePerMonth: 6200,
     },
     {
-      name: "Вт, Чт 19:45-20:45",
+      name: "Вт, Чт 19:45-20:45 (Олимпик)",
       level: "CONFIDENT" as const,
       daysOfWeek: ["Вт", "Чт"],
       time: "19:45-20:45",
       pool: "Олимпик",
+      pricePerMonth: 6200,
     },
   ];
 
   const groups: Record<string, string> = {};
   for (const g of groupData) {
     const existing = await prisma.group.findFirst({ where: { name: g.name } });
-    const group =
-      existing ?? (await prisma.group.create({ data: g }));
+    const group = existing
+      ? await prisma.group.update({
+          where: { id: existing.id },
+          data: { pricePerMonth: g.pricePerMonth },
+        })
+      : await prisma.group.create({ data: g });
     groups[g.name] = group.id;
   }
   console.log(`Групп готово: ${Object.keys(groups).length}`);

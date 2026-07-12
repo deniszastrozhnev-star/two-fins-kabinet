@@ -18,6 +18,8 @@ export function GroupForm({
     daysOfWeek?: string[];
     time?: string;
     pool?: string;
+    capacity?: number | null;
+    pricePerMonth?: number | null;
   };
   submitLabel?: string;
 }) {
@@ -68,6 +70,31 @@ export function GroupForm({
         </FieldGroup>
         <FieldGroup label="Бассейн" htmlFor="pool">
           <Input id="pool" name="pool" defaultValue={initial?.pool} required />
+        </FieldGroup>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldGroup
+          label="Вместимость"
+          htmlFor="capacity"
+          hint="необязательно; свыше — лист ожидания"
+        >
+          <Input
+            id="capacity"
+            name="capacity"
+            type="number"
+            min={0}
+            defaultValue={initial?.capacity ?? ""}
+          />
+        </FieldGroup>
+        <FieldGroup label="Тариф, ₽/мес" htmlFor="pricePerMonth">
+          <Input
+            id="pricePerMonth"
+            name="pricePerMonth"
+            type="number"
+            min={0}
+            defaultValue={initial?.pricePerMonth ?? ""}
+          />
         </FieldGroup>
       </div>
 

@@ -49,7 +49,18 @@ export default async function SchedulePage() {
                             <p className="font-heading text-base font-bold">
                               {group.name}
                             </p>
-                            <Badge tone="cyan">{group._count.children}</Badge>
+                            <Badge
+                              tone={
+                                group.capacity != null &&
+                                group._count.children >= group.capacity
+                                  ? "amber"
+                                  : "cyan"
+                              }
+                            >
+                              {group.capacity != null
+                                ? `${group._count.children} / ${group.capacity}`
+                                : group._count.children}
+                            </Badge>
                           </div>
                           <p className="mt-2 text-sm text-brand-text/60">
                             {group.daysOfWeek.length > 0

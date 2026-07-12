@@ -31,38 +31,63 @@ enum GroupLevel {
 }
 
 model Group {
-  id         String   @id @default(cuid())
-  name       String
-  level      GroupLevel
-  daysOfWeek String[] // напр. ["Пн", "Ср", "Пт"]
-  time       String // напр. "17:00–17:45"
-  pool       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  level         GroupLevel
+  daysOfWeek    String[] // напр. ["Пн", "Ср", "Пт"]
+  time          String // напр. "17:00–17:45"
+  pool          String
+  capacity      Int? // максимальная вместимость; без ограничения, если не задана
+  pricePerMonth Int? // тариф ₽/мес — для оценки выручки
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   children          Child[]
   attendanceRecords AttendanceRecord[] @relation("SessionGroup")
   workoffCloses     AttendanceRecord[] @relation("WorkoffClosesGroup")
+  waitlist          GroupWaitlist[]
+}
+
+enum ChildStatus {
+  ACTIVE
+  SICK // "болеет" — пауза без пометки "потерянного" ученика
 }
 
 model Child {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   lastName     String
   firstName    String
   groupId      String?
-  group        Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  group        Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
   parentPhone  String // хранится нормализованным (только цифры)
   paidUntil    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  status       ChildStatus @default(ACTIVE)
+  note         String? // заметка тренера (например при звонке "холодному" ребёнку)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  attendanceRecords AttendanceRecord[]
-  eventSignups      EventSignup[]
-  personalTrainings PersonalTraining[]
-  paymentReceipts   PaymentReceipt[]
+  attendanceRecords   AttendanceRecord[]
+  eventSignups        EventSignup[]
+  personalTrainings   PersonalTraining[]
+  paymentReceipts     PaymentReceipt[]
+  medicalCertificates MedicalCertificate[]
+  competitionResults  CompetitionResult[]
+  waitlistEntries     GroupWaitlist[]
 
   @@index([groupId])
   @@index([parentPhone])
+}
+
+model GroupWaitlist {
+  id        String   @id @default(cuid())
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([childId, groupId])
+  @@index([groupId])
 }
 
 enum AttendanceStatus {
@@ -122,6 +147,30 @@ model PaymentReceipt {
   contentType String? // image/jpeg, image/png, application/pdf и т.д. — для выбора превью/иконки
   createdAt   DateTime  @default(now())
   viewedAt    DateTime?
+
+  @@index([childId])
+}
+
+model MedicalCertificate {
+  id          String   @id @default(cuid())
+  childId     String
+  child       Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  contentType String?
+  validUntil  DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  @@index([childId])
+}
+
+model CompetitionResult {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  competitionName String
+  date            DateTime @db.Date
+  result          String
+  createdAt       DateTime @default(now())
 
   @@index([childId])
 }
