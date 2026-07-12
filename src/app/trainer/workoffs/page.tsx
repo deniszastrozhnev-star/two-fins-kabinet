@@ -29,7 +29,7 @@ export default async function WorkoffsPage({
 
   const groups = await prisma.group.findMany({
     orderBy: [{ level: "asc" }, { name: "asc" }],
-    select: { id: true, name: true },
+    select: { id: true, name: true, level: true },
   });
 
   if (groups.length === 0) {
@@ -51,17 +51,26 @@ export default async function WorkoffsPage({
   const dateStr = params.date ?? toDateInputValue(new Date());
   const date = parseDateInputValue(dateStr);
   const q = params.q ?? "";
+  const selectedGroup = groups.find((g) => g.id === groupId);
+  // У "Новичков" (малая чаша) отработки — только между собой, не со старшими группами
+  const levelRestriction =
+    selectedGroup?.level === "NOVICE" ? ("NOVICE" as const) : null;
 
   const [children, existingWorkoffs] = await Promise.all([
     prisma.child.findMany({
-      where: q
-        ? {
-            OR: [
-              { lastName: { contains: q, mode: "insensitive" } },
-              { firstName: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
+      where: {
+        AND: [
+          q
+            ? {
+                OR: [
+                  { lastName: { contains: q, mode: "insensitive" } },
+                  { firstName: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {},
+          levelRestriction ? { group: { level: levelRestriction } } : {},
+        ],
+      },
       include: { group: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
@@ -78,7 +87,11 @@ export default async function WorkoffsPage({
     <>
       <PageHeader
         title="Отработка"
-        description="Выберите занятие, куда пришли дети на отработку, и найдите их по имени — из любой группы школы"
+        description={
+          levelRestriction
+            ? "Занятие уровня «Новичок» (малая чаша) — в списке только дети из групп этого же уровня"
+            : "Выберите занятие, куда пришли дети на отработку, и найдите их по имени — из любой группы школы"
+        }
         action={
           back === "attendance" ? (
             <Link

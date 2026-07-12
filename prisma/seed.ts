@@ -2,7 +2,6 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hash } from "bcryptjs";
-import { normalizePhone } from "../src/lib/phone";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -19,41 +18,70 @@ async function main() {
   });
   console.log(`Главный тренер "${username}" готов.`);
 
+  // Название группы = само сочетание дня(-ей) недели и времени
   const groupData = [
     {
-      name: "Дельфинята-1",
-      level: "NOVICE" as const,
-      daysOfWeek: ["Пн", "Ср", "Пт"],
-      time: "16:00–16:45",
-      pool: "Бассейн №1",
-    },
-    {
-      name: "Дельфинята-2",
-      level: "NOVICE" as const,
-      daysOfWeek: ["Вт", "Чт"],
-      time: "16:00–16:45",
-      pool: "Бассейн №1",
-    },
-    {
-      name: "Акулята",
+      name: "Пн, Ср 20:30-21:30",
       level: "CONFIDENT" as const,
-      daysOfWeek: ["Пн", "Ср", "Пт"],
-      time: "17:00–17:45",
-      pool: "Бассейн №1",
+      daysOfWeek: ["Пн", "Ср"],
+      time: "20:30-21:30",
+      pool: "Лазурный",
     },
     {
-      name: "Спорт-1",
-      level: "SPORT" as const,
-      daysOfWeek: ["Вт", "Чт", "Сб"],
-      time: "18:00–19:00",
-      pool: "Бассейн №2",
+      name: "Вт, Чт 20:30-21:30",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Вт", "Чт"],
+      time: "20:30-21:30",
+      pool: "Лазурный",
     },
     {
-      name: "Сборная",
-      level: "TEAM" as const,
-      daysOfWeek: ["Пн", "Вт", "Ср", "Чт", "Пт"],
-      time: "19:00–20:30",
-      pool: "Бассейн №2",
+      name: "Сб 11:00-12:00",
+      level: "NOVICE" as const,
+      daysOfWeek: ["Сб"],
+      time: "11:00-12:00",
+      pool: "Лазурный (малая чаша, 6-8 лет)",
+    },
+    {
+      name: "Сб 12:00-13:00",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Сб"],
+      time: "12:00-13:00",
+      pool: "Лазурный",
+    },
+    {
+      name: "Сб, Вс 12:50-13:50",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Сб", "Вс"],
+      time: "12:50-13:50",
+      pool: "Лазурный",
+    },
+    {
+      name: "Вс 10:30-11:30",
+      level: "NOVICE" as const,
+      daysOfWeek: ["Вс"],
+      time: "10:30-11:30",
+      pool: "Лазурный (малая чаша, 6-8 лет)",
+    },
+    {
+      name: "Вс 12:00-13:00",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Вс"],
+      time: "12:00-13:00",
+      pool: "Лазурный",
+    },
+    {
+      name: "Пн, Пт 19:45-20:45",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Пн", "Пт"],
+      time: "19:45-20:45",
+      pool: "Олимпик",
+    },
+    {
+      name: "Вт, Чт 19:45-20:45",
+      level: "CONFIDENT" as const,
+      daysOfWeek: ["Вт", "Чт"],
+      time: "19:45-20:45",
+      pool: "Олимпик",
     },
   ];
 
@@ -65,65 +93,6 @@ async function main() {
     groups[g.name] = group.id;
   }
   console.log(`Групп готово: ${Object.keys(groups).length}`);
-
-  const childrenData = [
-    {
-      lastName: "Иванов",
-      firstName: "Матвей",
-      group: "Дельфинята-1",
-      phone: "+7 900 111-11-11",
-      paidInDays: 20,
-    },
-    {
-      lastName: "Петрова",
-      firstName: "Анна",
-      group: "Дельфинята-1",
-      phone: "+7 900 222-22-22",
-      paidInDays: -3,
-    },
-    {
-      lastName: "Сидоров",
-      firstName: "Егор",
-      group: "Акулята",
-      phone: "+7 900 333-33-33",
-      paidInDays: 4,
-    },
-    {
-      lastName: "Кузнецова",
-      firstName: "Мария",
-      group: "Спорт-1",
-      phone: "+7 900 444-44-44",
-      paidInDays: 15,
-    },
-    {
-      lastName: "Смирнов",
-      firstName: "Данил",
-      group: "Сборная",
-      phone: "+7 900 555-55-55",
-      paidInDays: null,
-    },
-  ];
-
-  for (const c of childrenData) {
-    const existing = await prisma.child.findFirst({
-      where: { lastName: c.lastName, firstName: c.firstName },
-    });
-    if (existing) continue;
-    const paidUntil =
-      c.paidInDays === null
-        ? null
-        : new Date(Date.now() + c.paidInDays * 24 * 60 * 60 * 1000);
-    await prisma.child.create({
-      data: {
-        lastName: c.lastName,
-        firstName: c.firstName,
-        groupId: groups[c.group],
-        parentPhone: normalizePhone(c.phone),
-        paidUntil,
-      },
-    });
-  }
-  console.log(`Детей готово: ${childrenData.length}`);
 
   const eventExists = await prisma.event.findFirst({
     where: { title: "Открытие сезона" },
