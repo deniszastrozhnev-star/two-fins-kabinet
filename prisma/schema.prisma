@@ -140,13 +140,15 @@ model PersonalTraining {
 }
 
 model PaymentReceipt {
-  id          String    @id @default(cuid())
-  childId     String
-  child       Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
-  fileUrl     String
-  contentType String? // image/jpeg, image/png, application/pdf и т.д. — для выбора превью/иконки
-  createdAt   DateTime  @default(now())
-  viewedAt    DateTime?
+  id               String    @id @default(cuid())
+  childId          String
+  child            Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  fileUrl          String
+  contentType      String? // image/jpeg, image/png, application/pdf и т.д. — для выбора превью/иконки
+  recognizedAmount Int? // сумма, распознанная OCR (если совпала с одним из тарифов)
+  resolvedAt       DateTime? // когда тренер выбрал вариант продления по подсказке — прячет её
+  createdAt        DateTime  @default(now())
+  viewedAt         DateTime?
 
   @@index([childId])
 }

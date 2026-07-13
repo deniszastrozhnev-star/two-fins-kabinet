@@ -5,6 +5,7 @@ import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
+import { resizeForUpload } from "@/lib/image";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
@@ -35,19 +36,21 @@ export async function uploadMedicalCertificateAction(
     return { error: "Укажите дату, до какой действительны анализы" };
   }
 
+  const { buffer, contentType } = await resizeForUpload(file);
+
   const safeName = `${child.lastName}-${child.firstName}`.replace(
     /[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g,
     "_",
   );
   const key = `medical/${safeName}/${Date.now()}-${file.name}`;
 
-  const blob = await put(key, file, { access: "private" });
+  const blob = await put(key, buffer, { access: "private", contentType });
 
   await prisma.medicalCertificate.create({
     data: {
       childId: child.id,
       fileUrl: blob.url,
-      contentType: file.type,
+      contentType,
       validUntil: parseDateInputValue(validUntilStr),
     },
   });

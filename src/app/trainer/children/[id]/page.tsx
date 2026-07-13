@@ -17,6 +17,7 @@ import {
   addCompetitionResultAction,
   deleteCompetitionResultAction,
 } from "@/lib/actions/competition-actions";
+import { getKnownTariffs } from "@/lib/tariffs";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -26,6 +27,7 @@ import { Input, FieldGroup } from "@/components/ui/Field";
 import { ChildForm } from "@/components/trainer/ChildForm";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { SaveButton } from "@/components/trainer/SaveButton";
+import { ReceiptTariffPrompt } from "@/components/trainer/ReceiptTariffPrompt";
 
 export default async function ChildDetailPage({
   params,
@@ -40,7 +42,7 @@ export default async function ChildDetailPage({
 
   await markLatestReceiptViewed(id);
 
-  const [groups, balance, history, receipts, certificates, results] =
+  const [groups, balance, history, receipts, certificates, results, tariffs] =
     await Promise.all([
       prisma.group.findMany({
         orderBy: [{ level: "asc" }, { name: "asc" }],
@@ -67,6 +69,7 @@ export default async function ChildDetailPage({
         where: { childId: id },
         orderBy: { date: "desc" },
       }),
+      getKnownTariffs(),
     ]);
 
   const payment = getPaymentStatus(child.paidUntil);
@@ -159,38 +162,54 @@ export default async function ChildDetailPage({
                 <ul className="flex flex-col divide-y divide-white/10">
                   {receipts.map((r) => {
                     const isImage = r.contentType?.startsWith("image/");
+                    const tariffMatch =
+                      r.recognizedAmount != null
+                        ? tariffs.find((t) => t.amount === r.recognizedAmount)
+                        : undefined;
                     return (
-                      <li key={r.id} className="flex items-center gap-3 py-2">
-                        <a
-                          href={`/api/receipts/${r.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0"
-                        >
-                          {isImage ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={`/api/receipts/${r.id}`}
-                              alt="Превью чека"
-                              className="h-12 w-12 rounded-lg border border-white/10 object-cover"
+                      <li key={r.id} className="flex flex-col gap-2 py-2">
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`/api/receipts/${r.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0"
+                          >
+                            {isImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={`/api/receipts/${r.id}`}
+                                alt="Превью чека"
+                                className="h-12 w-12 rounded-lg border border-white/10 object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-brand-text/60">
+                                PDF
+                              </span>
+                            )}
+                          </a>
+                          <span className="flex-1 text-sm text-brand-text/70">
+                            {formatDateRu(r.createdAt)}
+                          </span>
+                          <a
+                            href={`/api/receipts/${r.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-brand-cyan hover:underline"
+                          >
+                            {isImage ? "Открыть →" : "Открыть PDF →"}
+                          </a>
+                        </div>
+                        {r.recognizedAmount != null &&
+                          !r.resolvedAt &&
+                          tariffMatch && (
+                            <ReceiptTariffPrompt
+                              receiptId={r.id}
+                              childId={child.id}
+                              recognizedAmount={r.recognizedAmount}
+                              tariffLabel={tariffMatch.label}
                             />
-                          ) : (
-                            <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-brand-text/60">
-                              PDF
-                            </span>
                           )}
-                        </a>
-                        <span className="flex-1 text-sm text-brand-text/70">
-                          {formatDateRu(r.createdAt)}
-                        </span>
-                        <a
-                          href={`/api/receipts/${r.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-brand-cyan hover:underline"
-                        >
-                          {isImage ? "Открыть →" : "Открыть PDF →"}
-                        </a>
                       </li>
                     );
                   })}

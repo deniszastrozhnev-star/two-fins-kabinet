@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -10,10 +11,15 @@ import {
   verifySession,
 } from "@/lib/session";
 
-export async function getSession(): Promise<SessionPayload | null> {
+/**
+ * Обёрнуто в React cache(): и layout, и сама страница вызывают requireTrainer()/
+ * requireParentChild() независимо — без мемоизации это два похода в базу на
+ * каждую загрузку страницы вместо одного.
+ */
+export const getSession = cache(async (): Promise<SessionPayload | null> => {
   const store = await cookies();
   return verifySession(store.get(SESSION_COOKIE_NAME)?.value);
-}
+});
 
 export async function setSessionCookie(payload: SessionPayload) {
   const token = await signSession(payload);
@@ -33,7 +39,7 @@ export async function clearSessionCookie() {
 }
 
 /** Требует сессию тренера в Server Component/Action; иначе редиректит на /login. Возвращает данные тренера. */
-export async function requireTrainer() {
+export const requireTrainer = cache(async () => {
   const session = await getSession();
   if (!session || session.role !== "trainer") {
     redirect("/login");
@@ -45,19 +51,19 @@ export async function requireTrainer() {
     redirect("/login");
   }
   return trainer;
-}
+});
 
 /** Требует сессию ГЛАВНОГО тренера; обычного тренера редиректит на /trainer. Возвращает данные тренера. */
-export async function requireHeadTrainer() {
+export const requireHeadTrainer = cache(async () => {
   const trainer = await requireTrainer();
   if (trainer.role !== "HEAD") {
     redirect("/trainer");
   }
   return trainer;
-}
+});
 
 /** Требует сессию родителя в Server Component/Action; иначе редиректит на /parent-login. Возвращает ребёнка. */
-export async function requireParentChild() {
+export const requireParentChild = cache(async () => {
   const session = await getSession();
   if (!session || session.role !== "parent") {
     redirect("/parent-login");
@@ -70,4 +76,4 @@ export async function requireParentChild() {
     redirect("/parent-login");
   }
   return child;
-}
+});
