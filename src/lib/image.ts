@@ -25,7 +25,8 @@ export async function resizeForUpload(
       .jpeg({ quality: 82 })
       .toBuffer();
     return { buffer: resized, contentType: "image/jpeg" };
-  } catch {
+  } catch (err) {
+    console.error("resizeForUpload: sharp failed, using original", err);
     return { buffer: original, contentType: file.type };
   }
 }
