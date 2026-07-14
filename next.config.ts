@@ -6,8 +6,15 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["tesseract.js"],
   // Языковые данные OCR лежат локально (src/lib/tessdata) и читаются напрямую с диска —
   // без этого трассировщик Next.js не включит их в serverless-бандл на Vercel.
+  // tesseract.js полностью бандлим целиком: его worker_threads-скрипт грузится по
+  // динамическому пути в рантайме, трассировщик не видит такие require и обрезает пакет,
+  // из-за чего относительный require('..') внутри воркера падает на Vercel.
   outputFileTracingIncludes: {
-    "/**": ["./src/lib/tessdata/**"],
+    "/**": [
+      "./src/lib/tessdata/**",
+      "./node_modules/tesseract.js/**",
+      "./node_modules/tesseract.js-core/**",
+    ],
   },
 };
 
