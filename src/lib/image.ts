@@ -24,7 +24,9 @@ export async function resizeForUpload(
       .resize({ width: MAX_WIDTH, withoutEnlargement: true })
       .jpeg({ quality: 82 })
       .toBuffer();
-    return { buffer: resized, contentType: "image/jpeg" };
+    // Копируем в свежий Buffer: память из нативного аддона sharp иногда не проходит
+    // через fetch()-based загрузку (Vercel Blob) в serverless-окружении Vercel.
+    return { buffer: Buffer.from(resized), contentType: "image/jpeg" };
   } catch (err) {
     console.error("resizeForUpload: sharp failed, using original", err);
     return { buffer: original, contentType: file.type };
