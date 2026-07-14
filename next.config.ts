@@ -2,8 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // tesseract.js использует динамические require() до воркер-скрипта — при бандлинге
-  // сервером Next.js эти пути ломаются, поэтому пакет нужно оставить внешним
-  serverExternalPackages: ["tesseract.js"],
+  // сервером Next.js эти пути ломаются, поэтому пакет нужно оставить внешним.
+  // sharp грузит платформенный нативный .node-аддон по вычисляемому в рантайме пути —
+  // Next.js автоматически подхватывает это только для next/image, а не для прямого
+  // импорта в серверном коде, поэтому без явного исключения он тихо падает на Vercel.
+  serverExternalPackages: ["tesseract.js", "sharp"],
   // Языковые данные OCR лежат локально (src/lib/tessdata) и читаются напрямую с диска —
   // без этого трассировщик Next.js не включит их в serverless-бандл на Vercel.
   // tesseract.js полностью бандлим целиком: его worker_threads-скрипт грузится по
