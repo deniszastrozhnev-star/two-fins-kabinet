@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-base: #041e3d;
-  --color-brand-blue: #0b4f86;
-  --color-brand-cyan: #29d3e0;
-  --color-brand-violet: #5b7fff;
+  /* Палитра из финального логотипа. Названия токенов исторические (первая
+     версия сайта была в сине-голубых тонах) — сейчас "cyan" держит фиолетовый
+     неон, "violet" — розово-малиновый, но менять названия по всему коду
+     смысла нет, значения полностью определяют внешний вид. */
+  --color-brand-base: #03112f; /* тёмный низ фонового градиента */
+  --color-brand-purple: #4a0e88; /* верх фонового градиента */
+  --color-brand-blue: #3472fb; /* акцент 1 — синий неон */
+  --color-brand-cyan: #8c40fc; /* акцент 2 — фиолетовый неон (основной акцент интерфейса) */
+  --color-brand-violet: #d651fa; /* акцент 3 — розово-малиновый неон */
   --color-brand-text: #f0f6fa;
 
   --font-heading: var(--font-comfortaa), "Comic Sans MS", cursive;
@@ -19,7 +24,11 @@ html {
 
 body {
   min-height: 100%;
-  background: var(--color-brand-base);
+  background: linear-gradient(
+    180deg,
+    var(--color-brand-purple) 0%,
+    var(--color-brand-base) 100%
+  );
   color: var(--color-brand-text);
   font-family: var(--font-sans);
 }

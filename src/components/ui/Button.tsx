@@ -3,7 +3,7 @@ import Link from "next/link";
 
 const VARIANT_CLASSES = {
   primary:
-    "bg-brand-cyan text-brand-base font-semibold hover:brightness-110 active:brightness-95",
+    "bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-violet text-brand-text font-semibold hover:brightness-110 active:brightness-95",
   secondary:
     "bg-white/10 text-brand-text font-medium hover:bg-white/15 border border-white/15",
   danger:

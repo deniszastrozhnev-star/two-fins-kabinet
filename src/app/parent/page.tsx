@@ -79,7 +79,7 @@ export default async function ParentOverviewPage() {
                   href={SBP_LINK}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-cyan px-4 py-2.5 text-sm font-semibold text-brand-base transition hover:brightness-110"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-violet px-4 py-2.5 text-sm font-semibold text-brand-text transition hover:brightness-110"
                 >
                   Оплатить через СБП
                 </a>

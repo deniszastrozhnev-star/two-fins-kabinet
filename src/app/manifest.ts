@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Личный кабинет школы плавания Two Fins (Две Ласты)",
     start_url: "/",
     display: "standalone",
-    background_color: "#041e3d",
-    theme_color: "#29d3e0",
+    background_color: "#03112f",
+    theme_color: "#8c40fc",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
