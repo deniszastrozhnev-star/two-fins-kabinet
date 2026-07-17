@@ -17,9 +17,9 @@ export function AthleteLoginForm() {
         <Input id="firstName" name="firstName" autoComplete="off" required />
       </FieldGroup>
       <FieldGroup
-        label="Пароль"
+        label="Дата рождения"
         htmlFor="password"
-        hint="Дата рождения в формате ДДММГГГГ, например 06041992"
+        hint="Формат ДДММГГГГ, например 06041992. При первом входе эта дата станет вашим паролем"
       >
         <Input
           id="password"

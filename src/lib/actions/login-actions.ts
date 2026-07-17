@@ -1,13 +1,33 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { setSessionCookie } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
 
 export type ActionState = { error?: string } | undefined;
+
+/** Разбирает пароль спортсмена ДДММГГГГ в дату; null, если формат или сама дата невалидны. */
+function parseBirthDatePassword(raw: string): Date | null {
+  if (!/^\d{8}$/.test(raw)) return null;
+  const day = Number(raw.slice(0, 2));
+  const month = Number(raw.slice(2, 4));
+  const year = Number(raw.slice(4, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (!isValid(date)) return null;
+  // new Date переносит "31 февраля" на март и т.п. — проверяем, что компоненты не съехали
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  if (date.getTime() > Date.now()) return null;
+  return date;
+}
 
 export async function trainerLoginAction(
   _prevState: ActionState,
@@ -93,9 +113,17 @@ export async function athleteLoginAction(
   }
 
   if (!child.birthDate) {
-    return {
-      error: "Вход для этого спортсмена ещё не настроен, обратитесь к тренеру.",
-    };
+    // Первый вход этого спортсмена — введённая дата рождения привязывается
+    // к его записи и становится паролем на будущее.
+    const birthDate = parseBirthDatePassword(password);
+    if (!birthDate) {
+      return {
+        error: "Введите дату рождения в формате ДДММГГГГ, например 06041992",
+      };
+    }
+    await prisma.child.update({ where: { id: child.id }, data: { birthDate } });
+    await setSessionCookie({ role: "athlete", childId: child.id });
+    redirect("/athlete");
   }
 
   if (format(child.birthDate, "ddMMyyyy") !== password) {
