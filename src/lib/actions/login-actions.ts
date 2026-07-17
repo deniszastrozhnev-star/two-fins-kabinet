@@ -92,20 +92,14 @@ export async function athleteLoginAction(
 ): Promise<ActionState> {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const firstName = String(formData.get("firstName") ?? "").trim();
-  const phoneRaw = String(formData.get("phone") ?? "");
   const password = String(formData.get("password") ?? "").trim();
 
-  if (!lastName || !firstName || !phoneRaw || !password) {
+  if (!lastName || !firstName || !password) {
     return { error: "Заполните все поля" };
   }
 
-  // Телефон родителя — уже известный школе идентификатор ребёнка. Без него
-  // при совпадении фамилии+имени (и, при первом входе, даже даты рождения)
-  // у другого ученика можно было бы случайно попасть в чужой дневник.
-  const phone = normalizePhone(phoneRaw);
   const child = await prisma.child.findFirst({
     where: {
-      parentPhone: phone,
       lastName: { equals: lastName, mode: "insensitive" },
       firstName: { equals: firstName, mode: "insensitive" },
     },
@@ -114,7 +108,7 @@ export async function athleteLoginAction(
   if (!child) {
     return {
       error:
-        "Не удалось найти спортсмена с такими данными. Проверьте фамилию, имя и номер телефона, либо обратитесь к тренеру.",
+        "Не удалось найти спортсмена с такими данными. Проверьте фамилию и имя, либо обратитесь к тренеру.",
     };
   }
 

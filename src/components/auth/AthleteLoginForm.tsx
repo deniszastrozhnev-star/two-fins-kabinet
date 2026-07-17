@@ -17,21 +17,6 @@ export function AthleteLoginForm() {
         <Input id="firstName" name="firstName" autoComplete="off" required />
       </FieldGroup>
       <FieldGroup
-        label="Номер телефона родителя"
-        htmlFor="phone"
-        hint="Тот, что тренер записал при зачислении в группу"
-      >
-        <Input
-          id="phone"
-          name="phone"
-          type="tel"
-          inputMode="tel"
-          placeholder="+7 900 000-00-00"
-          autoComplete="tel"
-          required
-        />
-      </FieldGroup>
-      <FieldGroup
         label="Дата рождения"
         htmlFor="password"
         hint="Формат ДДММГГГГ, например 06041992. При первом входе эта дата станет вашим паролем"
