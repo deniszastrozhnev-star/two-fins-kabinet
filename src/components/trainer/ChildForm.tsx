@@ -19,6 +19,7 @@ export function ChildForm({
     groupId?: string | null;
     parentPhone?: string;
     paidUntil?: Date | null;
+    birthDate?: Date | null;
   };
   submitLabel?: string;
 }) {
@@ -68,6 +69,21 @@ export function ChildForm({
           placeholder="+7 900 000-00-00"
           defaultValue={initial?.parentPhone}
           required
+        />
+      </FieldGroup>
+
+      <FieldGroup
+        label="Дата рождения"
+        htmlFor="birthDate"
+        hint="Нужна для входа спортсмена в свой кабинет (пароль — дата в формате ДДММГГГГ)"
+      >
+        <Input
+          id="birthDate"
+          name="birthDate"
+          type="date"
+          defaultValue={
+            initial?.birthDate ? toDateInputValue(initial.birthDate) : ""
+          }
         />
       </FieldGroup>
 

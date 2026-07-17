@@ -16,12 +16,14 @@ function readChildFields(formData: FormData) {
   const parentPhone = normalizePhone(String(formData.get("parentPhone") ?? ""));
   const paidUntilRaw = String(formData.get("paidUntil") ?? "");
   const paidUntil = paidUntilRaw ? parseDateInputValue(paidUntilRaw) : null;
+  const birthDateRaw = String(formData.get("birthDate") ?? "");
+  const birthDate = birthDateRaw ? parseDateInputValue(birthDateRaw) : null;
 
   if (!lastName || !firstName) {
     throw new Error("Укажите фамилию и имя ребёнка");
   }
 
-  return { lastName, firstName, groupId, parentPhone, paidUntil };
+  return { lastName, firstName, groupId, parentPhone, paidUntil, birthDate };
 }
 
 export async function createChildAction(formData: FormData) {

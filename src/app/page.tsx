@@ -42,6 +42,22 @@ export default function HomePage() {
               </CardBody>
             </Card>
           </Link>
+
+          <Link href="/athlete-login">
+            <Card className="text-left transition hover:border-brand-cyan/50">
+              <CardBody className="flex items-center justify-between">
+                <div>
+                  <p className="font-heading text-lg font-bold">Я спортсмен</p>
+                  <p className="mt-1 text-sm text-brand-text/60">
+                    Дневник тренировок и рейтинг
+                  </p>
+                </div>
+                <span aria-hidden className="text-xl text-brand-cyan">
+                  →
+                </span>
+              </CardBody>
+            </Card>
+          </Link>
         </div>
       </div>
     </main>

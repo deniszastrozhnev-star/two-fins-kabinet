@@ -117,6 +117,7 @@ export default async function ChildDetailPage({
                 groupId: child.groupId,
                 parentPhone: child.parentPhone,
                 paidUntil: child.paidUntil,
+                birthDate: child.birthDate,
               }}
             />
           </CardBody>

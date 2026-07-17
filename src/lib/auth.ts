@@ -77,3 +77,19 @@ export const requireParentChild = cache(async () => {
   }
   return child;
 });
+
+/** Требует сессию спортсмена в Server Component/Action; иначе редиректит на /athlete-login. Возвращает ребёнка. */
+export const requireAthleteChild = cache(async () => {
+  const session = await getSession();
+  if (!session || session.role !== "athlete") {
+    redirect("/athlete-login");
+  }
+  const child = await prisma.child.findUnique({
+    where: { id: session.childId },
+    include: { group: true },
+  });
+  if (!child || !child.birthDate) {
+    redirect("/athlete-login");
+  }
+  return child;
+});

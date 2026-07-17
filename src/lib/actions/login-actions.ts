@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { setSessionCookie } from "@/lib/auth";
@@ -63,4 +64,44 @@ export async function parentLoginAction(
 
   await setSessionCookie({ role: "parent", childId: child.id });
   redirect("/parent");
+}
+
+export async function athleteLoginAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const password = String(formData.get("password") ?? "").trim();
+
+  if (!lastName || !firstName || !password) {
+    return { error: "Заполните все поля" };
+  }
+
+  const child = await prisma.child.findFirst({
+    where: {
+      lastName: { equals: lastName, mode: "insensitive" },
+      firstName: { equals: firstName, mode: "insensitive" },
+    },
+  });
+
+  if (!child) {
+    return {
+      error:
+        "Не удалось найти спортсмена с такими данными. Проверьте фамилию и имя, либо обратитесь к тренеру.",
+    };
+  }
+
+  if (!child.birthDate) {
+    return {
+      error: "Вход для этого спортсмена ещё не настроен, обратитесь к тренеру.",
+    };
+  }
+
+  if (format(child.birthDate, "ddMMyyyy") !== password) {
+    return { error: "Неверный пароль" };
+  }
+
+  await setSessionCookie({ role: "athlete", childId: child.id });
+  redirect("/athlete");
 }

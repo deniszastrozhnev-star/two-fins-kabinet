@@ -2,7 +2,8 @@ import { SignJWT, jwtVerify } from "jose";
 
 export type SessionPayload =
   | { role: "trainer"; trainerId: string }
-  | { role: "parent"; childId: string };
+  | { role: "parent"; childId: string }
+  | { role: "athlete"; childId: string };
 
 const COOKIE_NAME = "session";
 const TRAINER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 дней
@@ -39,6 +40,9 @@ export async function verifySession(
     }
     if (payload.role === "parent" && typeof payload.childId === "string") {
       return { role: "parent", childId: payload.childId };
+    }
+    if (payload.role === "athlete" && typeof payload.childId === "string") {
+      return { role: "athlete", childId: payload.childId };
     }
     return null;
   } catch {

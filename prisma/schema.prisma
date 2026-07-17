@@ -63,6 +63,7 @@ model Child {
   paidUntil    DateTime?
   status       ChildStatus @default(ACTIVE)
   note         String? // заметка тренера (например при звонке "холодному" ребёнку)
+  birthDate    DateTime?   @db.Date // нужна для входа спортсмена (пароль = дата в формате ДДММГГГГ)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -73,6 +74,8 @@ model Child {
   medicalCertificates MedicalCertificate[]
   competitionResults  CompetitionResult[]
   waitlistEntries     GroupWaitlist[]
+  poolWorkouts        PoolWorkout[]
+  gymWorkouts         GymWorkout[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -172,6 +175,31 @@ model CompetitionResult {
   competitionName String
   date            DateTime @db.Date
   result          String
+  createdAt       DateTime @default(now())
+
+  @@index([childId])
+}
+
+model PoolWorkout {
+  id           String   @id @default(cuid())
+  childId      String
+  child        Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  date         DateTime @db.Date
+  task         String // что проплыли, напр. "4×100 кроль"
+  volumeMeters Int // объём за тренировку, метры
+  feeling      String? // самочувствие — что болит/не болит, где было тяжело
+  createdAt    DateTime @default(now())
+
+  @@index([childId])
+}
+
+model GymWorkout {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  date            DateTime @db.Date
+  task            String
+  durationMinutes Int
   createdAt       DateTime @default(now())
 
   @@index([childId])
