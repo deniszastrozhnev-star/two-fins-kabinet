@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 /** Цена для родителя за одну персональную тренировку — не привязана к группе. */
 export const PERSONAL_TRAINING_PRICE = 1800;
 
+/** Комбинированный тариф из конструктора онлайн-записи (8 занятий/нед + доп. занятие = 12/мес),
+    не совпадает с pricePerMonth ни одной отдельной группы — иначе OCR чека не узнает эту сумму. */
+export const COMBINED_EXTRA_SESSION_TARIFF = 9000;
+
 export type TariffMatch = { amount: number; label: string };
 
 /** Все действующие тарифы школы: тарифы групп + персональная тренировка. */
@@ -21,6 +25,10 @@ export async function getKnownTariffs(): Promise<TariffMatch[]> {
   tariffs.push({
     amount: PERSONAL_TRAINING_PRICE,
     label: "персональная тренировка",
+  });
+  tariffs.push({
+    amount: COMBINED_EXTRA_SESSION_TARIFF,
+    label: "тариф 8 занятий/нед + допзанятие (12/мес)",
   });
 
   return tariffs;

@@ -1,33 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { format, isValid } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { setSessionCookie } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
+import { parseDateInputValue } from "@/lib/dates";
 
 export type ActionState = { error?: string } | undefined;
-
-/** Разбирает пароль спортсмена ДДММГГГГ в дату; null, если формат или сама дата невалидны. */
-function parseBirthDatePassword(raw: string): Date | null {
-  if (!/^\d{8}$/.test(raw)) return null;
-  const day = Number(raw.slice(0, 2));
-  const month = Number(raw.slice(2, 4));
-  const year = Number(raw.slice(4, 8));
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (!isValid(date)) return null;
-  // new Date переносит "31 февраля" на март и т.п. — проверяем, что компоненты не съехали
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  if (date.getTime() > Date.now()) return null;
-  return date;
-}
 
 export async function trainerLoginAction(
   _prevState: ActionState,
@@ -92,44 +72,28 @@ export async function athleteLoginAction(
 ): Promise<ActionState> {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const firstName = String(formData.get("firstName") ?? "").trim();
-  const password = String(formData.get("password") ?? "").trim();
+  const birthDateStr = String(formData.get("birthDate") ?? "");
 
-  if (!lastName || !firstName || !password) {
+  if (!lastName || !firstName || !birthDateStr) {
     return { error: "Заполните все поля" };
   }
+  const birthDate = parseDateInputValue(birthDateStr);
 
-  const child = await prisma.child.findFirst({
+  // Спортсмены — полностью отдельная от "Детей" система: если по ФИО+дате
+  // рождения записи ещё нет, она создаётся прямо здесь, самостоятельной
+  // регистрацией — без участия тренера и без связи с базой учеников школы.
+  let athlete = await prisma.athlete.findFirst({
     where: {
       lastName: { equals: lastName, mode: "insensitive" },
       firstName: { equals: firstName, mode: "insensitive" },
+      birthDate,
     },
   });
 
-  if (!child) {
-    return {
-      error:
-        "Не удалось найти спортсмена с такими данными. Проверьте фамилию и имя, либо обратитесь к тренеру.",
-    };
+  if (!athlete) {
+    athlete = await prisma.athlete.create({ data: { lastName, firstName, birthDate } });
   }
 
-  if (!child.birthDate) {
-    // Первый вход этого спортсмена — введённая дата рождения привязывается
-    // к его записи и становится паролем на будущее.
-    const birthDate = parseBirthDatePassword(password);
-    if (!birthDate) {
-      return {
-        error: "Введите дату рождения в формате ДДММГГГГ, например 06041992",
-      };
-    }
-    await prisma.child.update({ where: { id: child.id }, data: { birthDate } });
-    await setSessionCookie({ role: "athlete", childId: child.id });
-    redirect("/athlete");
-  }
-
-  if (format(child.birthDate, "ddMMyyyy") !== password) {
-    return { error: "Неверный пароль" };
-  }
-
-  await setSessionCookie({ role: "athlete", childId: child.id });
+  await setSessionCookie({ role: "athlete", athleteId: athlete.id });
   redirect("/athlete");
 }

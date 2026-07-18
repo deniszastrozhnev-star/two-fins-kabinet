@@ -72,11 +72,7 @@ export function ChildForm({
         />
       </FieldGroup>
 
-      <FieldGroup
-        label="Дата рождения"
-        htmlFor="birthDate"
-        hint="Нужна для входа спортсмена в свой кабинет (пароль — дата в формате ДДММГГГГ)"
-      >
+      <FieldGroup label="Дата рождения" htmlFor="birthDate">
         <Input
           id="birthDate"
           name="birthDate"

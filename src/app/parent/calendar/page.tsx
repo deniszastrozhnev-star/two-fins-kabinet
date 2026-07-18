@@ -13,6 +13,7 @@ const STATUS_CELL: Record<AttendanceStatus, string> = {
   PRESENT: "bg-emerald-500/25 text-emerald-200 border-emerald-500/40",
   ABSENT: "bg-red-500/25 text-red-200 border-red-500/40",
   WORKOFF: "bg-brand-cyan/25 text-brand-cyan border-brand-cyan/40",
+  EXTRA: "bg-brand-violet/25 text-brand-violet border-brand-violet/40",
 };
 
 export default async function ParentCalendarPage({

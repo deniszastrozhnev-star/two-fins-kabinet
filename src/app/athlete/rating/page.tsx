@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAthleteChild } from "@/lib/auth";
+import { requireAthlete } from "@/lib/auth";
 import { getAthleteLeaderboard, AthletePeriod } from "@/lib/athletes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -10,7 +10,7 @@ export default async function AthleteRatingPage({
 }: {
   searchParams: Promise<{ period?: string }>;
 }) {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
   const { period: periodParam } = await searchParams;
   const period: AthletePeriod = periodParam === "month" ? "month" : "week";
 
@@ -63,8 +63,8 @@ export default async function AthleteRatingPage({
               <tbody>
                 {board.map((row, i) => (
                   <tr
-                    key={row.childId}
-                    className={`border-b border-white/5 ${row.childId === child.id ? "bg-brand-cyan/10" : ""}`}
+                    key={row.athleteId}
+                    className={`border-b border-white/5 ${row.athleteId === athlete.id ? "bg-brand-cyan/10" : ""}`}
                   >
                     <td className="px-4 py-3 sm:px-5">
                       {period === "month" && i === 0 ? "🏆" : i + 1}

@@ -59,6 +59,24 @@ export default function HomePage() {
             </Card>
           </Link>
         </div>
+
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <Link href="/register">
+            <Card className="text-left transition hover:border-brand-violet/50">
+              <CardBody className="flex items-center justify-between">
+                <div>
+                  <p className="font-heading text-lg font-bold">Записаться в группу</p>
+                  <p className="mt-1 text-sm text-brand-text/60">
+                    Онлайн-запись без входа в кабинет
+                  </p>
+                </div>
+                <span aria-hidden className="text-xl text-brand-violet">
+                  →
+                </span>
+              </CardBody>
+            </Card>
+          </Link>
+        </div>
       </div>
     </main>
   );

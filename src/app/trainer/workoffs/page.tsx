@@ -12,6 +12,7 @@ import { GroupDateFilter } from "@/components/trainer/GroupDateFilter";
 import { SearchBox } from "@/components/trainer/SearchBox";
 import { AttendedToggle } from "@/components/trainer/AttendedToggle";
 import { SaveButton } from "@/components/trainer/SaveButton";
+import type { AttendanceStatus } from "@prisma/client";
 
 export default async function WorkoffsPage({
   searchParams,
@@ -21,11 +22,14 @@ export default async function WorkoffsPage({
     date?: string;
     q?: string;
     back?: string;
+    status?: string;
   }>;
 }) {
   await requireTrainer();
   const params = await searchParams;
   const back = params.back ?? "";
+  const status: AttendanceStatus = params.status === "EXTRA" ? "EXTRA" : "WORKOFF";
+  const isExtra = status === "EXTRA";
 
   const groups = await prisma.group.findMany({
     orderBy: [{ level: "asc" }, { name: "asc" }],
@@ -54,9 +58,9 @@ export default async function WorkoffsPage({
   const selectedGroup = groups.find((g) => g.id === groupId);
   // У "Новичков" (малая чаша) отработки — только между собой, не со старшими группами
   const levelRestriction =
-    selectedGroup?.level === "NOVICE" ? ("NOVICE" as const) : null;
+    !isExtra && selectedGroup?.level === "NOVICE" ? ("NOVICE" as const) : null;
 
-  const [children, existingWorkoffs] = await Promise.all([
+  const [children, existingRecords, entitlements] = await Promise.all([
     prisma.child.findMany({
       where: {
         AND: [
@@ -75,22 +79,31 @@ export default async function WorkoffsPage({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.attendanceRecord.findMany({
-      where: { groupId, date, status: "WORKOFF" },
+      where: { groupId, date, status },
       select: { childId: true },
     }),
+    isExtra
+      ? prisma.extraSessionEntitlement.findMany({
+          where: { groupId },
+          select: { childId: true, sessionsPerWeek: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const balances = await getWorkoffBalances(children.map((c) => c.id));
-  const attendedIds = new Set(existingWorkoffs.map((w) => w.childId));
+  const attendedIds = new Set(existingRecords.map((w) => w.childId));
+  const entitlementByChildId = new Map(entitlements.map((e) => [e.childId, e.sessionsPerWeek]));
 
   return (
     <>
       <PageHeader
-        title="Отработка"
+        title={isExtra ? "Допзанятие" : "Отработка"}
         description={
           levelRestriction
             ? "Занятие уровня «Новичок» (малая чаша) — в списке только дети из групп этого же уровня"
-            : "Выберите занятие, куда пришли дети на отработку, и найдите их по имени — из любой группы школы"
+            : isExtra
+              ? "Выберите занятие, куда пришли дети доп. занятием, и найдите их по имени — из любой группы школы"
+              : "Выберите занятие, куда пришли дети на отработку, и найдите их по имени — из любой группы школы"
         }
         action={
           back === "attendance" ? (
@@ -104,6 +117,25 @@ export default async function WorkoffsPage({
         }
       />
 
+      <div className="mb-4 flex gap-1.5">
+        <Link
+          href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&status=WORKOFF`}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            !isExtra ? "bg-brand-cyan/20 text-brand-cyan" : "text-brand-text/60 hover:bg-white/5"
+          }`}
+        >
+          Отработка
+        </Link>
+        <Link
+          href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&status=EXTRA`}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            isExtra ? "bg-brand-cyan/20 text-brand-cyan" : "text-brand-text/60 hover:bg-white/5"
+          }`}
+        >
+          Допзанятие
+        </Link>
+      </div>
+
       <Card className="mb-4">
         <CardBody>
           <GroupDateFilter
@@ -111,7 +143,7 @@ export default async function WorkoffsPage({
             groups={groups}
             groupId={groupId}
             date={dateStr}
-            extraHidden={{ q, back }}
+            extraHidden={{ q, back, status }}
           />
         </CardBody>
       </Card>
@@ -121,7 +153,7 @@ export default async function WorkoffsPage({
           action="/trainer/workoffs"
           defaultValue={q}
           placeholder="Поиск ребёнка по имени…"
-          extraHidden={{ groupId, date: dateStr, back }}
+          extraHidden={{ groupId, date: dateStr, back, status }}
         />
       </div>
 
@@ -132,10 +164,12 @@ export default async function WorkoffsPage({
           <input type="hidden" name="groupId" value={groupId} />
           <input type="hidden" name="date" value={dateStr} />
           <input type="hidden" name="back" value={back} />
+          <input type="hidden" name="status" value={status} />
           <Card>
             <CardBody className="flex flex-col divide-y divide-white/10 p-0">
               {children.map((child) => {
                 const balance = balances.get(child.id) ?? 0;
+                const entitlement = entitlementByChildId.get(child.id);
                 return (
                   <div
                     key={child.id}
@@ -148,11 +182,19 @@ export default async function WorkoffsPage({
                       </p>
                       <p className="text-xs text-brand-text/50">
                         {child.group?.name ?? "Без группы"}
-                        {balance > 0 && (
+                        {!isExtra && balance > 0 && (
                           <>
                             {" · "}
                             <Badge tone="amber" className="align-middle">
                               {balance} отраб.
+                            </Badge>
+                          </>
+                        )}
+                        {isExtra && entitlement != null && (
+                          <>
+                            {" · "}
+                            <Badge tone="violet" className="align-middle">
+                              право: {entitlement}×/нед
                             </Badge>
                           </>
                         )}
@@ -161,6 +203,7 @@ export default async function WorkoffsPage({
                     <AttendedToggle
                       childId={child.id}
                       defaultChecked={attendedIds.has(child.id)}
+                      label={isExtra ? "Пришёл на допзанятие" : "Пришёл на отработку"}
                     />
                   </div>
                 );
@@ -168,7 +211,7 @@ export default async function WorkoffsPage({
             </CardBody>
           </Card>
           <div className="mt-4 flex justify-end">
-            <SaveButton>Сохранить отработки</SaveButton>
+            <SaveButton>{isExtra ? "Сохранить допзанятия" : "Сохранить отработки"}</SaveButton>
           </div>
         </form>
       )}

@@ -16,19 +16,8 @@ export function AthleteLoginForm() {
       <FieldGroup label="Имя" htmlFor="firstName">
         <Input id="firstName" name="firstName" autoComplete="off" required />
       </FieldGroup>
-      <FieldGroup
-        label="Дата рождения"
-        htmlFor="password"
-        hint="Формат ДДММГГГГ, например 06041992. При первом входе эта дата станет вашим паролем"
-      >
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          inputMode="numeric"
-          autoComplete="off"
-          required
-        />
+      <FieldGroup label="Дата рождения" htmlFor="birthDate">
+        <Input id="birthDate" name="birthDate" type="date" required />
       </FieldGroup>
       {state?.error && (
         <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
@@ -36,6 +25,9 @@ export function AthleteLoginForm() {
         </p>
       )}
       <SubmitButton>Войти</SubmitButton>
+      <p className="text-center text-xs text-brand-text/50">
+        Если ты ещё не регистрировался — аккаунт создастся автоматически
+      </p>
     </form>
   );
 }

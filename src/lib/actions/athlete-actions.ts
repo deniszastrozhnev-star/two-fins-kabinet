@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireAthleteChild } from "@/lib/auth";
+import { requireAthlete } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
 
 export type ActionState = { error?: string; success?: string } | undefined;
@@ -17,7 +17,7 @@ export async function addPoolWorkoutAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
 
   const dateStr = String(formData.get("date") ?? "");
   const task = String(formData.get("task") ?? "").trim();
@@ -30,7 +30,7 @@ export async function addPoolWorkoutAction(
 
   await prisma.poolWorkout.create({
     data: {
-      childId: child.id,
+      athleteId: athlete.id,
       date: parseDateInputValue(dateStr),
       task,
       volumeMeters: Math.round(volumeMeters),
@@ -46,7 +46,7 @@ export async function addGymWorkoutAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
 
   const dateStr = String(formData.get("date") ?? "");
   const task = String(formData.get("task") ?? "").trim();
@@ -58,7 +58,7 @@ export async function addGymWorkoutAction(
 
   await prisma.gymWorkout.create({
     data: {
-      childId: child.id,
+      athleteId: athlete.id,
       date: parseDateInputValue(dateStr),
       task,
       durationMinutes: Math.round(durationMinutes),
@@ -70,19 +70,19 @@ export async function addGymWorkoutAction(
 }
 
 export async function deleteWorkoutAction(formData: FormData) {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
   const type = String(formData.get("type") ?? "");
   const id = String(formData.get("id") ?? "");
   if (!id || (type !== "pool" && type !== "gym")) {
     throw new Error("Не найдена запись");
   }
 
-  // Проверка владения через childId в where — иначе спортсмен смог бы
+  // Проверка владения через athleteId в where — иначе спортсмен смог бы
   // удалить чужую запись, зная её id.
   if (type === "pool") {
-    await prisma.poolWorkout.deleteMany({ where: { id, childId: child.id } });
+    await prisma.poolWorkout.deleteMany({ where: { id, athleteId: athlete.id } });
   } else {
-    await prisma.gymWorkout.deleteMany({ where: { id, childId: child.id } });
+    await prisma.gymWorkout.deleteMany({ where: { id, athleteId: athlete.id } });
   }
 
   revalidateAthletePaths();

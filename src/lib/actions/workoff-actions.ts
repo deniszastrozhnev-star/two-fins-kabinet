@@ -5,20 +5,24 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
+import type { AttendanceStatus } from "@prisma/client";
 
 /**
- * Экран "Отработки": отмечает, кто из показанных детей (весь поиск по школе)
- * сегодня пришёл на отработку в выбранную группу/занятие.
- * Отмеченные — получают/обновляют запись WORKOFF на эту дату+группу.
- * Снятые с отметки (были WORKOFF, но галочку убрали) — запись удаляется.
+ * Экран "Отработки"/"Допзанятие": отмечает, кто из показанных детей (весь поиск
+ * по школе) сегодня пришёл на отработку или доп. занятие в выбранную группу.
+ * Отмеченные — получают/обновляют запись со статусом status на эту дату+группу.
+ * Снятые с отметки — запись удаляется. workoffClosesGroupId проставляется только
+ * для WORKOFF — для EXTRA он не имеет смысла (никакой пропуск не закрывается).
  */
 export async function saveWorkoffAttendanceAction(formData: FormData) {
   const trainer = await requireTrainer();
 
   const groupId = String(formData.get("groupId") ?? "");
   const dateStr = String(formData.get("date") ?? "");
+  const statusRaw = String(formData.get("status") ?? "WORKOFF");
+  const status: AttendanceStatus = statusRaw === "EXTRA" ? "EXTRA" : "WORKOFF";
   if (!groupId || !dateStr) {
-    throw new Error("Не выбрана дата или группа отработки");
+    throw new Error("Не выбрана дата или группа");
   }
   const date = parseDateInputValue(dateStr);
 
@@ -31,7 +35,7 @@ export async function saveWorkoffAttendanceAction(formData: FormData) {
       where: {
         groupId,
         date,
-        status: "WORKOFF",
+        status,
         childId: { in: toRemove },
       },
     });
@@ -52,13 +56,15 @@ export async function saveWorkoffAttendanceAction(formData: FormData) {
             childId,
             groupId,
             date,
-            status: "WORKOFF",
-            workoffClosesGroupId: homeGroupById.get(childId) ?? groupId,
+            status,
+            workoffClosesGroupId:
+              status === "WORKOFF" ? (homeGroupById.get(childId) ?? groupId) : null,
             markedByTrainerId: trainer.id,
           },
           update: {
-            status: "WORKOFF",
-            workoffClosesGroupId: homeGroupById.get(childId) ?? groupId,
+            status,
+            workoffClosesGroupId:
+              status === "WORKOFF" ? (homeGroupById.get(childId) ?? groupId) : null,
             markedByTrainerId: trainer.id,
           },
         }),

@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 export type AthletePeriod = "week" | "month";
 
 export type AthleteRankRow = {
-  childId: string;
+  athleteId: string;
   lastName: string;
   firstName: string;
   poolVolumeMeters: number;
@@ -32,41 +32,40 @@ export function computeAthletePoints(volumeMeters: number, gymMinutes: number): 
   return volumeMeters / 100 + gymMinutes / 10;
 }
 
-/** Рейтинг всех спортсменов (у кого настроена дата рождения) за неделю/месяц, отсортированный по очкам. */
+/** Рейтинг всех спортсменов за неделю/месяц, отсортированный по очкам. */
 export async function getAthleteLeaderboard(
   period: AthletePeriod,
   reference = new Date(),
 ): Promise<AthleteRankRow[]> {
   const { start, end } = getPeriodRange(period, reference);
 
-  const [poolSums, gymSums, children] = await Promise.all([
+  const [poolSums, gymSums, athletes] = await Promise.all([
     prisma.poolWorkout.groupBy({
-      by: ["childId"],
+      by: ["athleteId"],
       where: { date: { gte: start, lte: end } },
       _sum: { volumeMeters: true },
     }),
     prisma.gymWorkout.groupBy({
-      by: ["childId"],
+      by: ["athleteId"],
       where: { date: { gte: start, lte: end } },
       _sum: { durationMinutes: true },
     }),
-    prisma.child.findMany({
-      where: { birthDate: { not: null } },
+    prisma.athlete.findMany({
       select: { id: true, lastName: true, firstName: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
   ]);
 
-  const poolByChild = new Map(poolSums.map((p) => [p.childId, p._sum.volumeMeters ?? 0]));
-  const gymByChild = new Map(gymSums.map((g) => [g.childId, g._sum.durationMinutes ?? 0]));
+  const poolByAthlete = new Map(poolSums.map((p) => [p.athleteId, p._sum.volumeMeters ?? 0]));
+  const gymByAthlete = new Map(gymSums.map((g) => [g.athleteId, g._sum.durationMinutes ?? 0]));
 
-  const rows: AthleteRankRow[] = children.map((c) => {
-    const poolVolumeMeters = poolByChild.get(c.id) ?? 0;
-    const gymMinutes = gymByChild.get(c.id) ?? 0;
+  const rows: AthleteRankRow[] = athletes.map((a) => {
+    const poolVolumeMeters = poolByAthlete.get(a.id) ?? 0;
+    const gymMinutes = gymByAthlete.get(a.id) ?? 0;
     return {
-      childId: c.id,
-      lastName: c.lastName,
-      firstName: c.firstName,
+      athleteId: a.id,
+      lastName: a.lastName,
+      firstName: a.firstName,
       poolVolumeMeters,
       gymMinutes,
       points: computeAthletePoints(poolVolumeMeters, gymMinutes),

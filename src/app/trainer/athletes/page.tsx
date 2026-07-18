@@ -22,12 +22,12 @@ export default async function TrainerAthletesPage({
     prisma.poolWorkout.findMany({
       orderBy: { date: "desc" },
       take: 100,
-      include: { child: { select: { lastName: true, firstName: true } } },
+      include: { athlete: { select: { lastName: true, firstName: true } } },
     }),
     prisma.gymWorkout.findMany({
       orderBy: { date: "desc" },
       take: 100,
-      include: { child: { select: { lastName: true, firstName: true } } },
+      include: { athlete: { select: { lastName: true, firstName: true } } },
     }),
   ]);
 
@@ -36,7 +36,7 @@ export default async function TrainerAthletesPage({
       id: w.id,
       type: "pool" as const,
       date: w.date,
-      childName: `${w.child.lastName} ${w.child.firstName}`,
+      athleteName: `${w.athlete.lastName} ${w.athlete.firstName}`,
       task: w.task,
       detail: `${w.volumeMeters} м${w.feeling ? ` · ${w.feeling}` : ""}`,
     })),
@@ -44,7 +44,7 @@ export default async function TrainerAthletesPage({
       id: w.id,
       type: "gym" as const,
       date: w.date,
-      childName: `${w.child.lastName} ${w.child.firstName}`,
+      athleteName: `${w.athlete.lastName} ${w.athlete.firstName}`,
       task: w.task,
       detail: `${w.durationMinutes} мин`,
     })),
@@ -85,7 +85,7 @@ export default async function TrainerAthletesPage({
             <div className="p-5">
               <EmptyState
                 title="Пока нет спортсменов"
-                description="Проставьте дату рождения ребёнку в его карточке, чтобы открыть ему вход спортсмена"
+                description="Спортсмены регистрируются самостоятельно на странице входа"
               />
             </div>
           ) : (
@@ -101,7 +101,7 @@ export default async function TrainerAthletesPage({
               </thead>
               <tbody>
                 {board.map((row, i) => (
-                  <tr key={row.childId} className="border-b border-white/5">
+                  <tr key={row.athleteId} className="border-b border-white/5">
                     <td className="px-4 py-3 sm:px-5">
                       {period === "month" && i === 0 ? "🏆" : i + 1}
                     </td>
@@ -139,7 +139,7 @@ export default async function TrainerAthletesPage({
                     <Badge tone={f.type === "pool" ? "cyan" : "violet"}>
                       {f.type === "pool" ? "Бассейн" : "ОФП"}
                     </Badge>
-                    <p className="text-sm font-medium">{f.childName}</p>
+                    <p className="text-sm font-medium">{f.athleteName}</p>
                   </div>
                   <p className="mt-1 text-xs text-brand-text/50">
                     {formatDateRu(f.date)} · {f.task} · {f.detail}

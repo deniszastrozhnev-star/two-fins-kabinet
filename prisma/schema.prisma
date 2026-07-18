@@ -42,10 +42,11 @@ model Group {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  children          Child[]
-  attendanceRecords AttendanceRecord[] @relation("SessionGroup")
-  workoffCloses     AttendanceRecord[] @relation("WorkoffClosesGroup")
-  waitlist          GroupWaitlist[]
+  children                 Child[]
+  attendanceRecords        AttendanceRecord[]        @relation("SessionGroup")
+  workoffCloses            AttendanceRecord[]        @relation("WorkoffClosesGroup")
+  waitlist                 GroupWaitlist[]
+  extraSessionEntitlements ExtraSessionEntitlement[]
 }
 
 enum ChildStatus {
@@ -63,22 +64,38 @@ model Child {
   paidUntil    DateTime?
   status       ChildStatus @default(ACTIVE)
   note         String? // заметка тренера (например при звонке "холодному" ребёнку)
-  birthDate    DateTime?   @db.Date // нужна для входа спортсмена (пароль = дата в формате ДДММГГГГ)
+  birthDate    DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  attendanceRecords   AttendanceRecord[]
-  eventSignups        EventSignup[]
-  personalTrainings   PersonalTraining[]
-  paymentReceipts     PaymentReceipt[]
-  medicalCertificates MedicalCertificate[]
-  competitionResults  CompetitionResult[]
-  waitlistEntries     GroupWaitlist[]
-  poolWorkouts        PoolWorkout[]
-  gymWorkouts         GymWorkout[]
+  attendanceRecords        AttendanceRecord[]
+  eventSignups             EventSignup[]
+  personalTrainings        PersonalTraining[]
+  paymentReceipts          PaymentReceipt[]
+  medicalCertificates      MedicalCertificate[]
+  competitionResults       CompetitionResult[]
+  waitlistEntries          GroupWaitlist[]
+  extraSessionEntitlements ExtraSessionEntitlement[]
 
   @@index([groupId])
   @@index([parentPhone])
+}
+
+// Право ребёнка на доп. занятия в неделю в ЧУЖОЙ группе (помимо основной groupId) —
+// фиксируется онлайн-записью для расчёта тарифа; фактическая отметка прихода на
+// такое занятие идёт через AttendanceRecord.status = EXTRA (см. ниже), группа и
+// уровень ребёнка при этом не меняются.
+model ExtraSessionEntitlement {
+  id              String   @id @default(cuid())
+  childId         String
+  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId         String
+  group           Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sessionsPerWeek Int
+  createdAt       DateTime @default(now())
+
+  @@unique([childId, groupId])
+  @@index([groupId])
 }
 
 model GroupWaitlist {
@@ -97,6 +114,7 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
   WORKOFF
+  EXTRA // "Допзанятие" — ребёнок пришёл в чужую группу доп. занятием (не отработка)
 }
 
 model AttendanceRecord {
@@ -180,29 +198,45 @@ model CompetitionResult {
   @@index([childId])
 }
 
+// Спортсмен — полностью независимая от Child учётная запись: самостоятельная
+// регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
+// разделом "Дети"/группами/посещаемостью.
+model Athlete {
+  id        String   @id @default(cuid())
+  lastName  String
+  firstName String
+  birthDate DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  poolWorkouts PoolWorkout[]
+  gymWorkouts  GymWorkout[]
+
+  @@index([lastName, firstName])
+}
+
 model PoolWorkout {
   id           String   @id @default(cuid())
-  childId      String
-  child        Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  athleteId    String
+  athlete      Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   date         DateTime @db.Date
   task         String // что проплыли, напр. "4×100 кроль"
   volumeMeters Int // объём за тренировку, метры
   feeling      String? // самочувствие — что болит/не болит, где было тяжело
   createdAt    DateTime @default(now())
 
-  @@index([childId])
+  @@index([athleteId])
 }
 
 model GymWorkout {
   id              String   @id @default(cuid())
-  childId         String
-  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  athleteId       String
+  athlete         Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   date            DateTime @db.Date
   task            String
   durationMinutes Int
   createdAt       DateTime @default(now())
 
-  @@index([childId])
+  @@index([athleteId])
 }
 
 enum EventType {

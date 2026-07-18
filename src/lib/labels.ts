@@ -18,6 +18,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   PRESENT: "Пришёл",
   ABSENT: "Не пришёл",
   WORKOFF: "Отработка",
+  EXTRA: "Допзанятие",
 };
 
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {

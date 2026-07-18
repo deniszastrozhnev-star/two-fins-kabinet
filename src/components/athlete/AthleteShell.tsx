@@ -9,10 +9,10 @@ const LINKS = [
 
 export function AthleteShell({
   children,
-  childName,
+  athleteName,
 }: {
   children: React.ReactNode;
-  childName: string;
+  athleteName: string;
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col pb-20 sm:pb-0">
@@ -22,7 +22,7 @@ export function AthleteShell({
             <p className="font-heading text-base font-bold text-brand-cyan leading-tight">
               Two Fins (Две Ласты)
             </p>
-            <p className="text-xs text-brand-text/50">{childName}</p>
+            <p className="text-xs text-brand-text/50">{athleteName}</p>
           </div>
           <form action={logoutAction}>
             <Button type="submit" variant="ghost" size="sm">

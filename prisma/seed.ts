@@ -96,13 +96,15 @@ async function main() {
 
   const groups: Record<string, string> = {};
   for (const g of groupData) {
+    // Лимиты вместимости: малая чаша (уровень "Новичок") — 24 человека, остальные группы — 16
+    const capacity = g.level === "NOVICE" ? 24 : 16;
     const existing = await prisma.group.findFirst({ where: { name: g.name } });
     const group = existing
       ? await prisma.group.update({
           where: { id: existing.id },
-          data: { pricePerMonth: g.pricePerMonth },
+          data: { pricePerMonth: g.pricePerMonth, capacity },
         })
-      : await prisma.group.create({ data: g });
+      : await prisma.group.create({ data: { ...g, capacity } });
     groups[g.name] = group.id;
   }
   console.log(`Групп готово: ${Object.keys(groups).length}`);

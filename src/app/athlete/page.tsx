@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAthleteChild } from "@/lib/auth";
+import { requireAthlete } from "@/lib/auth";
 import { getAthleteLeaderboard } from "@/lib/athletes";
 import { deleteWorkoutAction } from "@/lib/actions/athlete-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -12,17 +12,17 @@ import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { formatDateRu } from "@/lib/dates";
 
 export default async function AthletePage() {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
 
   const [weekBoard, monthBoard, poolWorkouts, gymWorkouts] = await Promise.all([
     getAthleteLeaderboard("week"),
     getAthleteLeaderboard("month"),
-    prisma.poolWorkout.findMany({ where: { childId: child.id }, orderBy: { date: "desc" } }),
-    prisma.gymWorkout.findMany({ where: { childId: child.id }, orderBy: { date: "desc" } }),
+    prisma.poolWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
+    prisma.gymWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
   ]);
 
-  const weekIndex = weekBoard.findIndex((r) => r.childId === child.id);
-  const monthIndex = monthBoard.findIndex((r) => r.childId === child.id);
+  const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);
+  const monthIndex = monthBoard.findIndex((r) => r.athleteId === athlete.id);
   const weekRow = weekIndex >= 0 ? weekBoard[weekIndex] : null;
   const monthRow = monthIndex >= 0 ? monthBoard[monthIndex] : null;
 

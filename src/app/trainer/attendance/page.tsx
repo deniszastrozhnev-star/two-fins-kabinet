@@ -56,9 +56,12 @@ export default async function AttendancePage({
   ]);
   const statusByChildId = new Map(records.map((r) => [r.childId, r.status]));
   const homeChildIds = new Set(children.map((c) => c.id));
-  // Дети из других групп, пришедшие на это занятие отработать — добавлены через /trainer/workoffs
+  // Дети из других групп, пришедшие на это занятие отработать/доп. занятием — добавлены через /trainer/workoffs
   const workoffVisitors = records.filter(
     (r) => r.status === "WORKOFF" && !homeChildIds.has(r.childId),
+  );
+  const extraVisitors = records.filter(
+    (r) => r.status === "EXTRA" && !homeChildIds.has(r.childId),
   );
 
   return (
@@ -67,13 +70,22 @@ export default async function AttendancePage({
         title="Посещаемость"
         description="Выберите группу и дату, отметьте каждого ребёнка"
         action={
-          <LinkButton
-            href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance`}
-            variant="secondary"
-            size="sm"
-          >
-            + Отработка
-          </LinkButton>
+          <div className="flex gap-2">
+            <LinkButton
+              href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance&status=WORKOFF`}
+              variant="secondary"
+              size="sm"
+            >
+              + Отработка
+            </LinkButton>
+            <LinkButton
+              href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance&status=EXTRA`}
+              variant="secondary"
+              size="sm"
+            >
+              + Допзанятие
+            </LinkButton>
+          </div>
         }
       />
 
@@ -145,10 +157,43 @@ export default async function AttendancePage({
           <p className="mt-2 text-xs text-brand-text/50">
             Изменить список можно на{" "}
             <Link
-              href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance`}
+              href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance&status=WORKOFF`}
               className="text-brand-cyan hover:underline"
             >
               экране «Отработка»
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+
+      {extraVisitors.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-2 font-heading text-lg font-bold">
+            Пришли на допзанятие
+          </h2>
+          <Card>
+            <CardBody className="flex flex-col divide-y divide-white/10 p-0">
+              {extraVisitors.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5"
+                >
+                  <span className="font-medium">
+                    {r.child.lastName} {r.child.firstName}
+                  </span>
+                  <Badge tone="violet">Допзанятие</Badge>
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+          <p className="mt-2 text-xs text-brand-text/50">
+            Изменить список можно на{" "}
+            <Link
+              href={`/trainer/workoffs?groupId=${groupId}&date=${dateStr}&back=attendance&status=EXTRA`}
+              className="text-brand-cyan hover:underline"
+            >
+              экране «Допзанятие»
             </Link>
             .
           </p>

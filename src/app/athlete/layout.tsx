@@ -1,4 +1,4 @@
-import { requireAthleteChild } from "@/lib/auth";
+import { requireAthlete } from "@/lib/auth";
 import { AthleteShell } from "@/components/athlete/AthleteShell";
 
 export default async function AthleteLayout({
@@ -6,10 +6,10 @@ export default async function AthleteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const child = await requireAthleteChild();
+  const athlete = await requireAthlete();
 
   return (
-    <AthleteShell childName={`${child.lastName} ${child.firstName}`}>
+    <AthleteShell athleteName={`${athlete.lastName} ${athlete.firstName}`}>
       {children}
     </AthleteShell>
   );
