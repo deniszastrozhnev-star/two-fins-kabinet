@@ -20,6 +20,7 @@ const HEAD_ONLY_LINKS: NavLinkDef[] = [
   { href: "/trainer/cold-children", label: "Холодные дети" },
   { href: "/trainer/metrics", label: "Показатели" },
   { href: "/trainer/athletes", label: "Спортсмены" },
+  { href: "/trainer/athlete-levels", label: "Тренировки" },
 ];
 
 export function TrainerShell({

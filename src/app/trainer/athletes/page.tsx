@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateRu } from "@/lib/dates";
 
+const TYPE_LABELS = { pool: "Бассейн", gym: "ОФП", flex: "Гибкость" } as const;
+const TYPE_TONES = { pool: "cyan", gym: "violet", flex: "green" } as const;
+
 export default async function TrainerAthletesPage({
   searchParams,
 }: {
@@ -17,7 +20,7 @@ export default async function TrainerAthletesPage({
   const { period: periodParam } = await searchParams;
   const period: AthletePeriod = periodParam === "month" ? "month" : "week";
 
-  const [board, poolWorkouts, gymWorkouts] = await Promise.all([
+  const [board, poolWorkouts, gymWorkouts, flexWorkouts] = await Promise.all([
     getAthleteLeaderboard(period),
     prisma.poolWorkout.findMany({
       orderBy: { date: "desc" },
@@ -25,6 +28,11 @@ export default async function TrainerAthletesPage({
       include: { athlete: { select: { lastName: true, firstName: true } } },
     }),
     prisma.gymWorkout.findMany({
+      orderBy: { date: "desc" },
+      take: 100,
+      include: { athlete: { select: { lastName: true, firstName: true } } },
+    }),
+    prisma.flexibilityWorkout.findMany({
       orderBy: { date: "desc" },
       take: 100,
       include: { athlete: { select: { lastName: true, firstName: true } } },
@@ -48,9 +56,19 @@ export default async function TrainerAthletesPage({
       task: w.task,
       detail: `${w.durationMinutes} мин`,
     })),
+    ...flexWorkouts.map((w) => ({
+      id: w.id,
+      type: "flex" as const,
+      date: w.date,
+      athleteName: `${w.athlete.lastName} ${w.athlete.firstName}`,
+      task: w.task,
+      detail: `${w.durationMinutes} мин`,
+    })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 100);
+
+  const missedRows = board.filter((row) => row.missedDays > 0);
 
   return (
     <>
@@ -89,13 +107,14 @@ export default async function TrainerAthletesPage({
               />
             </div>
           ) : (
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="w-full min-w-[620px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left text-brand-text/60">
                   <th className="px-4 py-3 font-medium sm:px-5">#</th>
                   <th className="px-4 py-3 font-medium sm:px-5">Спортсмен</th>
                   <th className="px-4 py-3 font-medium sm:px-5">Бассейн</th>
                   <th className="px-4 py-3 font-medium sm:px-5">ОФП</th>
+                  <th className="px-4 py-3 font-medium sm:px-5">Гибкость</th>
                   <th className="px-4 py-3 font-medium sm:px-5">Очки</th>
                 </tr>
               </thead>
@@ -115,8 +134,16 @@ export default async function TrainerAthletesPage({
                     </td>
                     <td className="px-4 py-3 sm:px-5">{row.poolVolumeMeters} м</td>
                     <td className="px-4 py-3 sm:px-5">{row.gymMinutes} мин</td>
-                    <td className="px-4 py-3 font-semibold text-brand-cyan sm:px-5">
-                      {row.points.toFixed(1)}
+                    <td className="px-4 py-3 sm:px-5">{row.flexibilityMinutes} мин</td>
+                    <td className="px-4 py-3 sm:px-5">
+                      <span className="font-semibold text-brand-cyan">
+                        {row.points.toFixed(1)}
+                      </span>
+                      {row.missedDays > 0 && (
+                        <Badge tone="red" className="ml-2">
+                          −{row.missedDays} дн.
+                        </Badge>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -125,6 +152,26 @@ export default async function TrainerAthletesPage({
           )}
         </CardBody>
       </Card>
+
+      {missedRows.length > 0 && (
+        <Card className="mb-6">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-lg font-bold">Пропущенные дни</h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {missedRows.map((row) => (
+                <li key={row.athleteId} className="py-2">
+                  <p className="text-sm font-medium">
+                    {row.lastName} {row.firstName}
+                  </p>
+                  <p className="mt-1 text-xs text-red-300">
+                    {row.missedDates.map((d) => formatDateRu(d)).join(", ")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardBody>
@@ -136,9 +183,7 @@ export default async function TrainerAthletesPage({
               {feed.map((f) => (
                 <li key={`${f.type}-${f.id}`} className="py-2">
                   <div className="flex items-center gap-2">
-                    <Badge tone={f.type === "pool" ? "cyan" : "violet"}>
-                      {f.type === "pool" ? "Бассейн" : "ОФП"}
-                    </Badge>
+                    <Badge tone={TYPE_TONES[f.type]}>{TYPE_LABELS[f.type]}</Badge>
                     <p className="text-sm font-medium">{f.athleteName}</p>
                   </div>
                   <p className="mt-1 text-xs text-brand-text/50">

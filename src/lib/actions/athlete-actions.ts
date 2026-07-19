@@ -69,11 +69,38 @@ export async function addGymWorkoutAction(
   return { success: "Тренировка добавлена" };
 }
 
+export async function addFlexibilityWorkoutAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const athlete = await requireAthlete();
+
+  const dateStr = String(formData.get("date") ?? "");
+  const task = String(formData.get("task") ?? "").trim();
+  const durationMinutes = Number(formData.get("durationMinutes") ?? "");
+
+  if (!dateStr || !task || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return { error: "Заполните дату, что тянул и время тренировки (минуты)" };
+  }
+
+  await prisma.flexibilityWorkout.create({
+    data: {
+      athleteId: athlete.id,
+      date: parseDateInputValue(dateStr),
+      task,
+      durationMinutes: Math.round(durationMinutes),
+    },
+  });
+
+  revalidateAthletePaths();
+  return { success: "Тренировка добавлена" };
+}
+
 export async function deleteWorkoutAction(formData: FormData) {
   const athlete = await requireAthlete();
   const type = String(formData.get("type") ?? "");
   const id = String(formData.get("id") ?? "");
-  if (!id || (type !== "pool" && type !== "gym")) {
+  if (!id || (type !== "pool" && type !== "gym" && type !== "flex")) {
     throw new Error("Не найдена запись");
   }
 
@@ -81,8 +108,10 @@ export async function deleteWorkoutAction(formData: FormData) {
   // удалить чужую запись, зная её id.
   if (type === "pool") {
     await prisma.poolWorkout.deleteMany({ where: { id, athleteId: athlete.id } });
-  } else {
+  } else if (type === "gym") {
     await prisma.gymWorkout.deleteMany({ where: { id, athleteId: athlete.id } });
+  } else {
+    await prisma.flexibilityWorkout.deleteMany({ where: { id, athleteId: athlete.id } });
   }
 
   revalidateAthletePaths();

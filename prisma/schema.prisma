@@ -202,16 +202,31 @@ model CompetitionResult {
 // регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
 // разделом "Дети"/группами/посещаемостью.
 model Athlete {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   lastName  String
   firstName String
-  birthDate DateTime @db.Date
-  createdAt DateTime @default(now())
+  birthDate DateTime      @db.Date
+  levelId   String?
+  level     AthleteLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
 
-  poolWorkouts PoolWorkout[]
-  gymWorkouts  GymWorkout[]
+  poolWorkouts        PoolWorkout[]
+  gymWorkouts         GymWorkout[]
+  flexibilityWorkouts FlexibilityWorkout[]
 
   @@index([lastName, firstName])
+}
+
+// Уровни спортсменов — отдельная сущность, которую ведёт главный тренер;
+// никак не связана с уровнями групп (GroupLevel) в разделе "Дети".
+model AthleteLevel {
+  id        String   @id @default(cuid())
+  name      String
+  ofpTask   String // задание по ОФП для этого уровня
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  athletes Athlete[]
 }
 
 model PoolWorkout {
@@ -233,6 +248,18 @@ model GymWorkout {
   athlete         Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   date            DateTime @db.Date
   task            String
+  durationMinutes Int
+  createdAt       DateTime @default(now())
+
+  @@index([athleteId])
+}
+
+model FlexibilityWorkout {
+  id              String   @id @default(cuid())
+  athleteId       String
+  athlete         Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  date            DateTime @db.Date
+  task            String // что тянул, напр. "шпагат, плечи, спина"
   durationMinutes Int
   createdAt       DateTime @default(now())
 

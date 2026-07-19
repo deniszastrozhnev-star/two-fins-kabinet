@@ -9,22 +9,30 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
+import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
 import { formatDateRu } from "@/lib/dates";
 
 export default async function AthletePage() {
   const athlete = await requireAthlete();
 
-  const [weekBoard, monthBoard, poolWorkouts, gymWorkouts] = await Promise.all([
-    getAthleteLeaderboard("week"),
-    getAthleteLeaderboard("month"),
-    prisma.poolWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
-    prisma.gymWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
-  ]);
+  const [weekBoard, monthBoard, poolWorkouts, gymWorkouts, flexWorkouts, athleteWithLevel] =
+    await Promise.all([
+      getAthleteLeaderboard("week"),
+      getAthleteLeaderboard("month"),
+      prisma.poolWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
+      prisma.gymWorkout.findMany({ where: { athleteId: athlete.id }, orderBy: { date: "desc" } }),
+      prisma.flexibilityWorkout.findMany({
+        where: { athleteId: athlete.id },
+        orderBy: { date: "desc" },
+      }),
+      prisma.athlete.findUnique({ where: { id: athlete.id }, select: { level: true } }),
+    ]);
 
   const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);
   const monthIndex = monthBoard.findIndex((r) => r.athleteId === athlete.id);
   const weekRow = weekIndex >= 0 ? weekBoard[weekIndex] : null;
   const monthRow = monthIndex >= 0 ? monthBoard[monthIndex] : null;
+  const level = athleteWithLevel?.level ?? null;
 
   const history = [
     ...poolWorkouts.map((w) => ({
@@ -41,7 +49,17 @@ export default async function AthletePage() {
       task: w.task,
       detail: `${w.durationMinutes} мин`,
     })),
+    ...flexWorkouts.map((w) => ({
+      id: w.id,
+      type: "flex" as const,
+      date: w.date,
+      task: w.task,
+      detail: `${w.durationMinutes} мин`,
+    })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const TYPE_LABELS = { pool: "Бассейн", gym: "ОФП", flex: "Гибкость" } as const;
+  const TYPE_TONES = { pool: "cyan", gym: "violet", flex: "green" } as const;
 
   return (
     <>
@@ -55,12 +73,27 @@ export default async function AthletePage() {
               {weekRow ? weekRow.points.toFixed(1) : "0.0"} очков
             </p>
             <p className="mt-1 text-sm text-brand-text/60">
-              {weekRow?.poolVolumeMeters ?? 0} м в бассейне · {weekRow?.gymMinutes ?? 0} мин ОФП
+              {weekRow?.poolVolumeMeters ?? 0} м в бассейне · {weekRow?.gymMinutes ?? 0} мин ОФП ·{" "}
+              {weekRow?.flexibilityMinutes ?? 0} мин гибкости
             </p>
             {weekIndex >= 0 && (
               <p className="mt-2 text-sm text-brand-cyan">
                 Место в рейтинге: {weekIndex + 1} из {weekBoard.length}
               </p>
+            )}
+            {weekRow && weekRow.missedDays > 0 && (
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <p className="text-xs font-medium text-red-300">
+                  Штрафы за пропуски (−{weekRow.missedDays * 2} очков)
+                </p>
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {weekRow.missedDates.map((d) => (
+                    <li key={d.toISOString()} className="text-xs text-brand-text/50">
+                      −2 очка — нет записи за {formatDateRu(d)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </CardBody>
         </Card>
@@ -71,18 +104,49 @@ export default async function AthletePage() {
               {monthRow ? monthRow.points.toFixed(1) : "0.0"} очков
             </p>
             <p className="mt-1 text-sm text-brand-text/60">
-              {monthRow?.poolVolumeMeters ?? 0} м в бассейне · {monthRow?.gymMinutes ?? 0} мин ОФП
+              {monthRow?.poolVolumeMeters ?? 0} м в бассейне · {monthRow?.gymMinutes ?? 0} мин ОФП ·{" "}
+              {monthRow?.flexibilityMinutes ?? 0} мин гибкости
             </p>
             {monthIndex >= 0 && (
               <p className="mt-2 text-sm text-brand-cyan">
                 Место в рейтинге: {monthIndex + 1} из {monthBoard.length}
               </p>
             )}
+            {monthRow && monthRow.missedDays > 0 && (
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <p className="text-xs font-medium text-red-300">
+                  Штрафы за пропуски (−{monthRow.missedDays * 2} очков)
+                </p>
+                <ul className="mt-1 flex max-h-32 flex-col gap-0.5 overflow-y-auto">
+                  {monthRow.missedDates.map((d) => (
+                    <li key={d.toISOString()} className="text-xs text-brand-text/50">
+                      −2 очка — нет записи за {formatDateRu(d)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardBody>
         </Card>
       </div>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-1 font-heading text-lg font-bold">Мой уровень</h2>
+          {level ? (
+            <>
+              <p className="text-sm font-medium text-brand-cyan">{level.name}</p>
+              <p className="mt-1 text-sm text-brand-text/70">{level.ofpTask}</p>
+            </>
+          ) : (
+            <p className="text-sm text-brand-text/50">
+              Уровень пока не назначен, обратитесь к тренеру
+            </p>
+          )}
+        </CardBody>
+      </Card>
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-3">
         <Card>
           <CardBody>
             <h2 className="mb-4 font-heading text-lg font-bold">
@@ -95,6 +159,12 @@ export default async function AthletePage() {
           <CardBody>
             <h2 className="mb-4 font-heading text-lg font-bold">ОФП (зал)</h2>
             <GymWorkoutForm />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 font-heading text-lg font-bold">Гибкость</h2>
+            <FlexibilityWorkoutForm />
           </CardBody>
         </Card>
       </div>
@@ -110,9 +180,7 @@ export default async function AthletePage() {
                 <li key={`${h.type}-${h.id}`} className="flex items-center justify-between gap-3 py-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Badge tone={h.type === "pool" ? "cyan" : "violet"}>
-                        {h.type === "pool" ? "Бассейн" : "ОФП"}
-                      </Badge>
+                      <Badge tone={TYPE_TONES[h.type]}>{TYPE_LABELS[h.type]}</Badge>
                       <p className="text-sm font-medium">{h.task}</p>
                     </div>
                     <p className="mt-1 text-xs text-brand-text/50">
