@@ -198,6 +198,19 @@ model CompetitionResult {
   @@index([childId])
 }
 
+// Спортивный разряд — анкетное поле, заполняет сам спортсмен, тренер не подтверждает.
+enum AthleteRank {
+  YOUTH_3 // 3 юношеский
+  YOUTH_2 // 2 юношеский
+  YOUTH_1 // 1 юношеский
+  ADULT_3 // 3 взрослый
+  ADULT_2 // 2 взрослый
+  ADULT_1 // 1 взрослый
+  KMS
+  MS
+  MSMK
+}
+
 // Спортсмен — полностью независимая от Child учётная запись: самостоятельная
 // регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
 // разделом "Дети"/группами/посещаемостью.
@@ -208,11 +221,13 @@ model Athlete {
   birthDate DateTime      @db.Date
   levelId   String?
   level     AthleteLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
+  rank      AthleteRank?
   createdAt DateTime      @default(now())
 
   poolWorkouts        PoolWorkout[]
   gymWorkouts         GymWorkout[]
   flexibilityWorkouts FlexibilityWorkout[]
+  competitionResults  AthleteCompetitionResult[]
 
   @@index([lastName, firstName])
 }
@@ -261,6 +276,23 @@ model FlexibilityWorkout {
   date            DateTime @db.Date
   task            String // что тянул, напр. "шпагат, плечи, спина"
   durationMinutes Int
+  createdAt       DateTime @default(now())
+
+  @@index([athleteId])
+}
+
+// Результат заплыва на соревновании. Личный рекорд по связке дистанция+стиль
+// не хранится отдельным флагом — вычисляется на лету как минимальный
+// resultCentis среди записей с одинаковыми distance+style (см. src/lib/athleteCompetitions.ts).
+model AthleteCompetitionResult {
+  id              String   @id @default(cuid())
+  athleteId       String
+  athlete         Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  competitionName String
+  date            DateTime @db.Date
+  distance        String // напр. "50 м"
+  style           String // напр. "кроль"
+  resultCentis    Int // время в сотых долях секунды — для надёжного сравнения/сортировки
   createdAt       DateTime @default(now())
 
   @@index([athleteId])

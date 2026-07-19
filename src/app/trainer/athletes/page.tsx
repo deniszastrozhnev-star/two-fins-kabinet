@@ -2,11 +2,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireHeadTrainer } from "@/lib/auth";
 import { getAthleteLeaderboard, AthletePeriod } from "@/lib/athletes";
+import { getAllAthleteRecords } from "@/lib/athleteCompetitions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateRu } from "@/lib/dates";
+import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 
 const TYPE_LABELS = { pool: "Бассейн", gym: "ОФП", flex: "Гибкость" } as const;
 const TYPE_TONES = { pool: "cyan", gym: "violet", flex: "green" } as const;
@@ -20,24 +22,29 @@ export default async function TrainerAthletesPage({
   const { period: periodParam } = await searchParams;
   const period: AthletePeriod = periodParam === "month" ? "month" : "week";
 
-  const [board, poolWorkouts, gymWorkouts, flexWorkouts] = await Promise.all([
-    getAthleteLeaderboard(period),
-    prisma.poolWorkout.findMany({
-      orderBy: { date: "desc" },
-      take: 100,
-      include: { athlete: { select: { lastName: true, firstName: true } } },
-    }),
-    prisma.gymWorkout.findMany({
-      orderBy: { date: "desc" },
-      take: 100,
-      include: { athlete: { select: { lastName: true, firstName: true } } },
-    }),
-    prisma.flexibilityWorkout.findMany({
-      orderBy: { date: "desc" },
-      take: 100,
-      include: { athlete: { select: { lastName: true, firstName: true } } },
-    }),
-  ]);
+  const [board, poolWorkouts, gymWorkouts, flexWorkouts, athleteRanks, records] =
+    await Promise.all([
+      getAthleteLeaderboard(period),
+      prisma.poolWorkout.findMany({
+        orderBy: { date: "desc" },
+        take: 100,
+        include: { athlete: { select: { lastName: true, firstName: true } } },
+      }),
+      prisma.gymWorkout.findMany({
+        orderBy: { date: "desc" },
+        take: 100,
+        include: { athlete: { select: { lastName: true, firstName: true } } },
+      }),
+      prisma.flexibilityWorkout.findMany({
+        orderBy: { date: "desc" },
+        take: 100,
+        include: { athlete: { select: { lastName: true, firstName: true } } },
+      }),
+      prisma.athlete.findMany({ select: { id: true, rank: true } }),
+      getAllAthleteRecords(),
+    ]);
+
+  const rankByAthlete = new Map(athleteRanks.map((a) => [a.id, a.rank]));
 
   const feed = [
     ...poolWorkouts.map((w) => ({
@@ -119,13 +126,23 @@ export default async function TrainerAthletesPage({
                 </tr>
               </thead>
               <tbody>
-                {board.map((row, i) => (
+                {board.map((row, i) => {
+                  const rank = rankByAthlete.get(row.athleteId);
+                  return (
                   <tr key={row.athleteId} className="border-b border-white/5">
                     <td className="px-4 py-3 sm:px-5">
                       {period === "month" && i === 0 ? "🏆" : i + 1}
                     </td>
                     <td className="px-4 py-3 font-medium sm:px-5">
                       {row.lastName} {row.firstName}
+                      {rank && (
+                        <span
+                          className="ml-2 text-xs font-semibold"
+                          style={{ color: ATHLETE_RANK_COLORS[rank] }}
+                        >
+                          {ATHLETE_RANK_LABELS[rank]}
+                        </span>
+                      )}
                       {period === "month" && i === 0 && (
                         <Badge tone="amber" className="ml-2">
                           Лучший спортсмен месяца
@@ -146,12 +163,43 @@ export default async function TrainerAthletesPage({
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
         </CardBody>
       </Card>
+
+      {records.some((r) => r.records.length > 0) && (
+        <Card className="mb-6">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-lg font-bold">Личные рекорды</h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {records
+                .filter((r) => r.records.length > 0)
+                .map((r) => (
+                  <li key={r.athleteId} className="py-2">
+                    <p className="text-sm font-medium">
+                      {r.lastName} {r.firstName}
+                    </p>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                      {r.records.map((rec) => (
+                        <li
+                          key={`${rec.distance}-${rec.style}`}
+                          className="text-xs text-brand-text/60"
+                        >
+                          {rec.distance} · {rec.style} —{" "}
+                          <span className="font-semibold text-amber-300">{rec.resultLabel}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
 
       {missedRows.length > 0 && (
         <Card className="mb-6">

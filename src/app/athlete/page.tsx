@@ -10,12 +10,14 @@ import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
+import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
 import { formatDateRu } from "@/lib/dates";
+import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 
 export default async function AthletePage() {
   const athlete = await requireAthlete();
 
-  const [weekBoard, monthBoard, poolWorkouts, gymWorkouts, flexWorkouts, athleteWithLevel] =
+  const [weekBoard, monthBoard, poolWorkouts, gymWorkouts, flexWorkouts, athleteExtra] =
     await Promise.all([
       getAthleteLeaderboard("week"),
       getAthleteLeaderboard("month"),
@@ -25,14 +27,15 @@ export default async function AthletePage() {
         where: { athleteId: athlete.id },
         orderBy: { date: "desc" },
       }),
-      prisma.athlete.findUnique({ where: { id: athlete.id }, select: { level: true } }),
+      prisma.athlete.findUnique({ where: { id: athlete.id }, select: { level: true, rank: true } }),
     ]);
 
   const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);
   const monthIndex = monthBoard.findIndex((r) => r.athleteId === athlete.id);
   const weekRow = weekIndex >= 0 ? weekBoard[weekIndex] : null;
   const monthRow = monthIndex >= 0 ? monthBoard[monthIndex] : null;
-  const level = athleteWithLevel?.level ?? null;
+  const level = athleteExtra?.level ?? null;
+  const rank = athleteExtra?.rank ?? null;
 
   const history = [
     ...poolWorkouts.map((w) => ({
@@ -63,6 +66,23 @@ export default async function AthletePage() {
 
   return (
     <>
+      <div className="mb-6 flex flex-col items-center gap-3 text-center">
+        {rank ? (
+          <p
+            className="font-heading text-3xl font-bold sm:text-4xl"
+            style={{
+              color: ATHLETE_RANK_COLORS[rank],
+              textShadow: `0 0 12px ${ATHLETE_RANK_COLORS[rank]}, 0 0 32px ${ATHLETE_RANK_COLORS[rank]}`,
+            }}
+          >
+            {ATHLETE_RANK_LABELS[rank]}
+          </p>
+        ) : (
+          <p className="text-sm text-brand-text/50">Укажи свой разряд</p>
+        )}
+        <AthleteRankSelect currentRank={rank} />
+      </div>
+
       <PageHeader title="Дневник" description="Добавь тренировку и следи за своими показателями" />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
