@@ -75,7 +75,7 @@ export function EventForm({
       <FieldGroup
         label="Для кого подходит"
         htmlFor="suitableFor"
-        hint="например: 8–10 лет, Уверенный пловец"
+        hint="например: 8–10 лет, Уверенный"
       >
         <Input
           id="suitableFor"

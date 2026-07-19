@@ -6,8 +6,12 @@ export type SessionPayload =
   | { role: "athlete"; athleteId: string };
 
 const COOKIE_NAME = "session";
-const TRAINER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 дней
-const PARENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 180; // 180 дней
+// Единый срок для всех ролей — раньше тренер получал всего 30 дней, а
+// родитель/спортсмен 180; вместе со скользящим продлением в src/proxy.ts
+// (перевыпускает токен при каждом заходе) это означает, что вход не
+// слетает, пока пользователь сам не нажмёт «Выйти» — при условии, что он
+// заходит в кабинет хотя бы раз в 90 дней.
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 дней
 
 function getSecretKey() {
   const secret = process.env.JWT_SECRET;
@@ -17,8 +21,20 @@ function getSecretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export function maxAgeFor(role: SessionPayload["role"]): number {
-  return role === "trainer" ? TRAINER_MAX_AGE_SECONDS : PARENT_MAX_AGE_SECONDS;
+export function maxAgeFor(_role: SessionPayload["role"]): number {
+  return SESSION_MAX_AGE_SECONDS;
+}
+
+/** Общие опции cookie сессии — используются и при первом входе (src/lib/auth.ts),
+ * и при скользящем продлении на каждом запросе (src/proxy.ts). */
+export function sessionCookieOptions(role: SessionPayload["role"]) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: maxAgeFor(role),
+  };
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {

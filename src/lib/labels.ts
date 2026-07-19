@@ -7,8 +7,8 @@ import type {
 
 export const LEVEL_LABELS: Record<GroupLevel, string> = {
   NOVICE: "Новичок",
-  CONFIDENT: "Уверенный пловец",
-  SPORT: "Спортивный уровень",
+  CONFIDENT: "Уверенный",
+  SPORT: "Спорт группа",
   TEAM: "Сборная школы",
 };
 

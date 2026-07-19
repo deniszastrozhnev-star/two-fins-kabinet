@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   SESSION_COOKIE_NAME,
   SessionPayload,
-  maxAgeFor,
+  sessionCookieOptions,
   signSession,
   verifySession,
 } from "@/lib/session";
@@ -24,13 +24,7 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
 export async function setSessionCookie(payload: SessionPayload) {
   const token = await signSession(payload);
   const store = await cookies();
-  store.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: maxAgeFor(payload.role),
-  });
+  store.set(SESSION_COOKIE_NAME, token, sessionCookieOptions(payload.role));
 }
 
 export async function clearSessionCookie() {
