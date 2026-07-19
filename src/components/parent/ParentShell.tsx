@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/parent", label: "Обзор", exact: true },
   { href: "/parent/calendar", label: "Календарь" },
   { href: "/parent/workoff-schedule", label: "Отработки" },
+  { href: "/parent/rank-standards", label: "Разряды" },
   { href: "/parent/events", label: "Новости" },
 ];
 

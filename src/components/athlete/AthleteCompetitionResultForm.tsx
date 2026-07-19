@@ -2,9 +2,10 @@
 
 import { useActionState, useRef, useEffect } from "react";
 import { addAthleteCompetitionResultAction } from "@/lib/actions/athlete-competition-actions";
-import { FieldGroup, Input } from "@/components/ui/Field";
+import { FieldGroup, Input, Select } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { toDateInputValue } from "@/lib/dates";
+import { FIN_DISCIPLINE_LABELS, FIN_DISCIPLINE_ORDER, TIMING_LABELS } from "@/lib/labels";
 
 export function AthleteCompetitionResultForm() {
   const [state, formAction] = useActionState(addAthleteCompetitionResultAction, undefined);
@@ -36,11 +37,26 @@ export function AthleteCompetitionResultForm() {
         </FieldGroup>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FieldGroup label="Дистанция" htmlFor="distance">
-          <Input id="distance" name="distance" placeholder="50 м" required />
+        <FieldGroup label="Дисциплина" htmlFor="discipline">
+          <Select id="discipline" name="discipline" defaultValue="" required>
+            <option value="" disabled>
+              Выберите дисциплину
+            </option>
+            {FIN_DISCIPLINE_ORDER.map((d) => (
+              <option key={d} value={d}>
+                {FIN_DISCIPLINE_LABELS[d]}
+              </option>
+            ))}
+          </Select>
         </FieldGroup>
-        <FieldGroup label="Стиль" htmlFor="style">
-          <Input id="style" name="style" placeholder="кроль" required />
+        <FieldGroup label="Хронометраж" htmlFor="timing">
+          <Select id="timing" name="timing" defaultValue="AUTO" required>
+            {(Object.keys(TIMING_LABELS) as (keyof typeof TIMING_LABELS)[]).map((t) => (
+              <option key={t} value={t}>
+                {TIMING_LABELS[t]}
+              </option>
+            ))}
+          </Select>
         </FieldGroup>
       </div>
 

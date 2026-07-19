@@ -10,6 +10,7 @@ const BASE_LINKS: NavLinkDef[] = [
   { href: "/trainer/children", label: "Дети" },
   { href: "/trainer/schedule", label: "Расписание" },
   { href: "/trainer/personal-trainings", label: "Персональные тренировки" },
+  { href: "/trainer/rank-standards", label: "Разряды" },
   { href: "/trainer/events", label: "Новости и события" },
   { href: "/trainer/settings", label: "Настройки" },
 ];

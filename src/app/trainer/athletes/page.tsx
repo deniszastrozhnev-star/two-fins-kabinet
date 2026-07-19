@@ -186,10 +186,10 @@ export default async function TrainerAthletesPage({
                     <ul className="mt-1 flex flex-col gap-0.5">
                       {r.records.map((rec) => (
                         <li
-                          key={`${rec.distance}-${rec.style}`}
+                          key={`${rec.disciplineLabel}-${rec.timingLabel}`}
                           className="text-xs text-brand-text/60"
                         >
-                          {rec.distance} · {rec.style} —{" "}
+                          {rec.disciplineLabel} · {rec.timingLabel} —{" "}
                           <span className="font-semibold text-amber-300">{rec.resultLabel}</span>
                         </li>
                       ))}

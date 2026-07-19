@@ -11,6 +11,8 @@ import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
 import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
+import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
+import { getSuggestedRankForAthlete } from "@/lib/rankStandards";
 import { formatDateRu } from "@/lib/dates";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 
@@ -27,7 +29,10 @@ export default async function AthletePage() {
         where: { athleteId: athlete.id },
         orderBy: { date: "desc" },
       }),
-      prisma.athlete.findUnique({ where: { id: athlete.id }, select: { level: true, rank: true } }),
+      prisma.athlete.findUnique({
+        where: { id: athlete.id },
+        select: { level: true, rank: true, gender: true },
+      }),
     ]);
 
   const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);
@@ -36,6 +41,8 @@ export default async function AthletePage() {
   const monthRow = monthIndex >= 0 ? monthBoard[monthIndex] : null;
   const level = athleteExtra?.level ?? null;
   const rank = athleteExtra?.rank ?? null;
+  const gender = athleteExtra?.gender ?? null;
+  const suggestedRank = await getSuggestedRankForAthlete(athlete.id, gender);
 
   const history = [
     ...poolWorkouts.map((w) => ({
@@ -81,6 +88,23 @@ export default async function AthletePage() {
           <p className="text-sm text-brand-text/50">Укажи свой разряд</p>
         )}
         <AthleteRankSelect currentRank={rank} />
+
+        {suggestedRank && (
+          <p className="text-sm text-brand-text/60">
+            По результатам соревнований:{" "}
+            <span className="font-semibold" style={{ color: ATHLETE_RANK_COLORS[suggestedRank] }}>
+              {ATHLETE_RANK_LABELS[suggestedRank]}
+            </span>{" "}
+            — при желании укажи в «Мой разряд» выше
+          </p>
+        )}
+
+        <div className="flex items-center gap-2">
+          {!gender && (
+            <p className="text-xs text-brand-text/50">Укажи пол, чтобы видеть подсказку по разряду:</p>
+          )}
+          <AthleteGenderSelect currentGender={gender} />
+        </div>
       </div>
 
       <PageHeader title="Дневник" description="Добавь тренировку и следи за своими показателями" />

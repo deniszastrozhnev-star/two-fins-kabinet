@@ -2,7 +2,10 @@ import type {
   AthleteRank,
   AttendanceStatus,
   EventType,
+  FinDiscipline,
+  Gender,
   GroupLevel,
+  TimingType,
   TrainerRole,
 } from "@prisma/client";
 
@@ -70,3 +73,45 @@ export const ATHLETE_RANK_ORDER: AthleteRank[] = [
   "MS",
   "MSMK",
 ];
+
+export const FIN_DISCIPLINE_LABELS: Record<FinDiscipline, string> = {
+  APNEA50: "50 ныр.",
+  M50: "50 м",
+  M100: "100 м",
+  M200: "200 м",
+  M400: "400 м",
+  M800: "800 м",
+  M1500: "1500 м",
+  UNDERWATER100: "100 п/п",
+  UNDERWATER400: "400 п/п",
+  CLASSIC50: "50 кл/п",
+  CLASSIC100: "100 кл/п",
+  CLASSIC200: "200 кл/п",
+  CLASSIC400: "400 кл/п",
+};
+
+export const FIN_DISCIPLINE_ORDER: FinDiscipline[] = [
+  "APNEA50",
+  "M50",
+  "M100",
+  "M200",
+  "M400",
+  "M800",
+  "M1500",
+  "UNDERWATER100",
+  "UNDERWATER400",
+  "CLASSIC50",
+  "CLASSIC100",
+  "CLASSIC200",
+  "CLASSIC400",
+];
+
+export const TIMING_LABELS: Record<TimingType, string> = {
+  MANUAL: "Ручной",
+  AUTO: "Авто",
+};
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  MALE: "Мужской",
+  FEMALE: "Женский",
+};

@@ -39,7 +39,7 @@ export default async function AthleteCompetitionsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">
-                        {r.distance} · {r.style}
+                        {r.disciplineLabel} · {r.timingLabel}
                       </p>
                       {r.isRecord && <Badge tone="amber">Личный рекорд</Badge>}
                     </div>

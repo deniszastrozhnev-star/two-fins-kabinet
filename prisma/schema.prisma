@@ -211,6 +211,14 @@ enum AthleteRank {
   MSMK
 }
 
+// Пол — анкетное поле, заполняет сам спортсмен (нужен для сопоставления
+// личных рекордов с таблицей разрядов ЕВСК, где норматив у каждого разряда
+// разный для М и Ж).
+enum Gender {
+  MALE
+  FEMALE
+}
+
 // Спортсмен — полностью независимая от Child учётная запись: самостоятельная
 // регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
 // разделом "Дети"/группами/посещаемостью.
@@ -222,6 +230,7 @@ model Athlete {
   levelId   String?
   level     AthleteLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
   rank      AthleteRank?
+  gender    Gender?
   createdAt DateTime      @default(now())
 
   poolWorkouts        PoolWorkout[]
@@ -281,21 +290,56 @@ model FlexibilityWorkout {
   @@index([athleteId])
 }
 
-// Результат заплыва на соревновании. Личный рекорд по связке дистанция+стиль
+// Дисциплины плавания в ластах по классификации ЕВСК.
+enum FinDiscipline {
+  APNEA50 // 50 ныр.
+  M50 // 50 м
+  M100 // 100 м
+  M200 // 200 м
+  M400 // 400 м
+  M800 // 800 м
+  M1500 // 1500 м
+  UNDERWATER100 // 100 п/п
+  UNDERWATER400 // 400 п/п
+  CLASSIC50 // 50 кл/п
+  CLASSIC100 // 100 кл/п
+  CLASSIC200 // 200 кл/п
+  CLASSIC400 // 400 кл/п
+}
+
+enum TimingType {
+  MANUAL // Ручной хронометраж
+  AUTO // Автоматический хронометраж
+}
+
+// Результат заплыва на соревновании. Личный рекорд по связке дисциплина+хронометраж
 // не хранится отдельным флагом — вычисляется на лету как минимальный
-// resultCentis среди записей с одинаковыми distance+style (см. src/lib/athleteCompetitions.ts).
+// resultCentis среди записей с одинаковыми discipline+timing (см. src/lib/athleteCompetitions.ts).
 model AthleteCompetitionResult {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   athleteId       String
-  athlete         Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete         Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   competitionName String
-  date            DateTime @db.Date
-  distance        String // напр. "50 м"
-  style           String // напр. "кроль"
+  date            DateTime      @db.Date
+  discipline      FinDiscipline
+  timing          TimingType
   resultCentis    Int // время в сотых долях секунды — для надёжного сравнения/сортировки
-  createdAt       DateTime @default(now())
+  createdAt       DateTime      @default(now())
 
   @@index([athleteId])
+}
+
+// Справочная таблица нормативов ЕВСК 2023-24 по плаванию в ластах — заполняется
+// один раз seed-скриптом (prisma/seedRankStandards.mjs), не редактируется через UI.
+model RankStandard {
+  id           String        @id @default(cuid())
+  discipline   FinDiscipline
+  timing       TimingType
+  gender       Gender
+  rank         AthleteRank
+  centiseconds Int
+
+  @@unique([discipline, timing, gender, rank])
 }
 
 enum EventType {
