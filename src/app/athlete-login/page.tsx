@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { Card, CardBody } from "@/components/ui/Card";
 import { AthleteLoginForm } from "@/components/auth/AthleteLoginForm";
 
-export default function AthleteLoginPage() {
+export default async function AthleteLoginPage() {
+  const session = await getSession();
+  if (session?.role === "athlete") redirect("/athlete");
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">

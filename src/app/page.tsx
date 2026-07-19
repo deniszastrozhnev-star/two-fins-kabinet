@@ -1,7 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { Card, CardBody } from "@/components/ui/Card";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // PWA открывается со значка "На домой" всегда с этого адреса (start_url в
+  // манифесте) — без этой проверки уже вошедший пользователь при каждом
+  // запуске видел бы стартовый экран выбора роли вместо своего кабинета,
+  // даже если кука сессии ещё вполне действительна.
+  const session = await getSession();
+  if (session?.role === "trainer") redirect("/trainer");
+  if (session?.role === "parent") redirect("/parent");
+  if (session?.role === "athlete") redirect("/athlete");
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md text-center">
