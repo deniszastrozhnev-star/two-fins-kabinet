@@ -18,7 +18,7 @@ export function ParentShell({
   childName: string;
 }) {
   return (
-    <div className="flex min-h-full flex-1 flex-col pb-20 sm:pb-0">
+    <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-white/10 bg-brand-base/70 backdrop-blur-md sticky top-0 z-20">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
           <div>
@@ -33,7 +33,7 @@ export function ParentShell({
             </Button>
           </form>
         </div>
-        <nav className="mx-auto hidden max-w-3xl gap-1 px-4 pb-2 sm:flex">
+        <nav className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4 pb-2">
           {LINKS.map((link) => (
             <NavLink
               key={link.href}
@@ -52,23 +52,6 @@ export function ParentShell({
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
         {children}
       </main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-brand-base/95 backdrop-blur-md sm:hidden">
-        <div className="mx-auto flex max-w-3xl">
-          {LINKS.map((link) => (
-            <NavLink
-              key={link.href}
-              href={link.href}
-              exact={link.exact}
-              className="mx-1 my-1.5 flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition"
-              activeClassName="bg-brand-cyan/15 text-brand-cyan shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)]"
-              inactiveClassName="text-brand-text/50"
-            >
-              {link.label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }
