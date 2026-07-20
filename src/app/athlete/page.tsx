@@ -32,7 +32,7 @@ export default async function AthletePage() {
       }),
       prisma.athlete.findUnique({
         where: { id: athlete.id },
-        select: { level: true, rank: true, gender: true },
+        select: { level: true, rank: true, gender: true, linkedChildId: true },
       }),
     ]);
 
@@ -202,7 +202,7 @@ export default async function AthletePage() {
             <h2 className="mb-4 font-heading text-lg font-bold">
               Тренировка в бассейне
             </h2>
-            <PoolWorkoutForm />
+            <PoolWorkoutForm hasLinkedChild={athleteExtra?.linkedChildId != null} />
           </CardBody>
         </Card>
         <Card>

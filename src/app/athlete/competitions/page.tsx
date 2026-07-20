@@ -1,6 +1,8 @@
 import { requireAthlete } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getAthleteCompetitionHistory } from "@/lib/athleteCompetitions";
 import { deleteAthleteCompetitionResultAction } from "@/lib/actions/athlete-competition-actions";
+import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -11,7 +13,19 @@ import { formatDateRu } from "@/lib/dates";
 
 export default async function AthleteCompetitionsPage() {
   const athlete = await requireAthlete();
-  const results = await getAthleteCompetitionHistory(athlete.id);
+  const athleteExtra = await prisma.athlete.findUnique({
+    where: { id: athlete.id },
+    select: { linkedChildId: true },
+  });
+  const [results, courseResults] = await Promise.all([
+    getAthleteCompetitionHistory(athlete.id),
+    athleteExtra?.linkedChildId
+      ? prisma.competitionResult.findMany({
+          where: { childId: athleteExtra.linkedChildId, competitionName: COURSE_RESULT_NAME },
+          orderBy: { date: "desc" },
+        })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <>
@@ -26,6 +40,26 @@ export default async function AthleteCompetitionsPage() {
           <AthleteCompetitionResultForm />
         </CardBody>
       </Card>
+
+      {courseResults.length > 0 && (
+        <Card className="mb-6">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-lg font-bold">Курсовка (группа)</h2>
+            <p className="mb-3 text-xs text-brand-text/50">
+              Результаты курсовки из обычной группы — вносит тренер или ты сам через «Тренировку в
+              бассейне»
+            </p>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {courseResults.map((r) => (
+                <li key={r.id} className="py-2">
+                  <p className="text-sm font-medium">{r.result}</p>
+                  <p className="mt-1 text-xs text-brand-text/50">{formatDateRu(r.date)}</p>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardBody>

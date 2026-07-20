@@ -76,6 +76,7 @@ model Child {
   competitionResults       CompetitionResult[]
   waitlistEntries          GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
+  linkedAthlete            Athlete?
 
   @@index([groupId])
   @@index([parentPhone])
@@ -223,19 +224,25 @@ enum Gender {
 // регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
 // разделом "Дети"/группами/посещаемостью.
 model Athlete {
-  id        String       @id @default(cuid())
-  lastName  String
-  firstName String
-  birthDate DateTime     @db.Date
-  level     GroupLevel? // те же 3 значения, что и у групп (Новичок/Уверенный/Спорт группа); назначает главный тренер
-  rank      AthleteRank?
-  gender    Gender?
-  createdAt DateTime     @default(now())
+  id            String       @id @default(cuid())
+  lastName      String
+  firstName     String
+  birthDate     DateTime     @db.Date
+  level         GroupLevel? // те же 3 значения, что и у групп (Новичок/Уверенный/Спорт группа); назначает главный тренер
+  rank          AthleteRank?
+  gender        Gender?
+  // Связь с обычным учеником ("Дети"), если это один и тот же реальный ребёнок —
+  // определяется автоматически по совпадению ФИО+даты рождения при входе спортсмена
+  // (см. athleteLoginAction), позволяет спортсмену видеть курсовку, внесённую тренером.
+  linkedChildId String?      @unique
+  linkedChild   Child?       @relation(fields: [linkedChildId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
 
   poolWorkouts        PoolWorkout[]
   gymWorkouts         GymWorkout[]
   flexibilityWorkouts FlexibilityWorkout[]
   competitionResults  AthleteCompetitionResult[]
+  levelTrainingLogs   LevelTrainingLog[]
 
   @@index([lastName, firstName])
 }
@@ -249,6 +256,28 @@ model LevelTraining {
   ofpTask         String
   flexibilityTask String
   updatedAt       DateTime   @updatedAt
+}
+
+enum TrainingLogType {
+  OFP
+  FLEXIBILITY
+}
+
+// Архив отметок выполнения назначенных тренером заданий (ОФП/Гибкость) по уровню —
+// отдельно от дневника (PoolWorkout/GymWorkout/FlexibilityWorkout), который спортсмен
+// заполняет по факту тренировки. Хранится вечно, level — снимок на момент отметки,
+// не ссылка (при смене уровня спортсмена история не должна "переписываться").
+model LevelTrainingLog {
+  id              String          @id @default(cuid())
+  athleteId       String
+  athlete         Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  level           GroupLevel
+  type            TrainingLogType
+  date            DateTime        @db.Date
+  durationMinutes Int
+  createdAt       DateTime        @default(now())
+
+  @@index([athleteId])
 }
 
 model PoolWorkout {

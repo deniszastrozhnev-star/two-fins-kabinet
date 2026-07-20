@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAthlete } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
+import { parseSwimTime } from "@/lib/swimTime";
+import { upsertCourseResult } from "@/lib/courseResults";
+import { COURSE_DISTANCES } from "@/lib/labels";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
@@ -37,6 +40,23 @@ export async function addPoolWorkoutAction(
       feeling,
     },
   });
+
+  if (formData.get("isCourse") === "on") {
+    const distance = String(formData.get("courseDistance") ?? "");
+    const timeRaw = String(formData.get("courseTime") ?? "").trim();
+    const centis = parseSwimTime(timeRaw);
+    if (!(COURSE_DISTANCES as readonly string[]).includes(distance) || centis === null) {
+      return { error: "Не удалось разобрать время курсовки, формат: 32.45 или 1:02.34" };
+    }
+    const current = await prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: { linkedChildId: true },
+    });
+    if (current?.linkedChildId) {
+      await upsertCourseResult(current.linkedChildId, parseDateInputValue(dateStr), distance, centis);
+      revalidatePath("/parent");
+    }
+  }
 
   revalidateAthletePaths();
   return { success: "Тренировка добавлена" };

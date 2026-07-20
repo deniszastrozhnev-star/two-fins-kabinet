@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireHeadTrainer } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -59,9 +60,9 @@ export default async function AthleteLevelsPage() {
                     key={a.id}
                     className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
-                    <span className="font-medium">
+                    <Link href={`/trainer/athletes/${a.id}`} className="font-medium hover:underline">
                       {a.lastName} {a.firstName}
-                    </span>
+                    </Link>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-brand-text/50">Уровень:</span>
                       <AssignAthleteLevelSelect athleteId={a.id} currentLevel={a.level} />

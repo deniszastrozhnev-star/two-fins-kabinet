@@ -3,11 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
 import { saveAttendanceAction } from "@/lib/actions/attendance-actions";
+import { saveCourseResultsAction } from "@/lib/actions/course-actions";
+import { COURSE_DISTANCES } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Select } from "@/components/ui/Field";
 import { GroupDateFilter } from "@/components/trainer/GroupDateFilter";
 import { AttendanceStatusPicker } from "@/components/trainer/AttendanceStatusPicker";
 import { SaveButton } from "@/components/trainer/SaveButton";
@@ -64,6 +67,15 @@ export default async function AttendancePage({
     (r) => r.status === "EXTRA" && !homeChildIds.has(r.childId),
   );
 
+  // Присутствовавшие в этот день — своя группа (отмеченные "Пришёл") + пришедшие
+  // на отработку/допзанятие из других групп — для внесения курсовки.
+  const homePresent = children.filter((c) => statusByChildId.get(c.id) === "PRESENT");
+  const courseChildren = [
+    ...homePresent,
+    ...workoffVisitors.map((r) => r.child),
+    ...extraVisitors.map((r) => r.child),
+  ];
+
   return (
     <>
       <PageHeader
@@ -97,6 +109,53 @@ export default async function AttendancePage({
             groupId={groupId}
             date={dateStr}
           />
+        </CardBody>
+      </Card>
+
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-3 font-heading text-lg font-bold">Курсовка</h2>
+          {courseChildren.length === 0 ? (
+            <p className="text-sm text-brand-text/50">
+              Сначала отметьте посещаемость — курсовку можно внести только пришедшим сегодня.
+            </p>
+          ) : (
+            <form action={saveCourseResultsAction}>
+              <input type="hidden" name="groupId" value={groupId} />
+              <input type="hidden" name="date" value={dateStr} />
+              <div className="mb-4 max-w-xs">
+                <Select name="distance" defaultValue={COURSE_DISTANCES[1]} required>
+                  {COURSE_DISTANCES.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-col divide-y divide-white/10">
+                {courseChildren.map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2"
+                  >
+                    <input type="hidden" name="childIds" value={child.id} />
+                    <span className="text-sm font-medium">
+                      {child.lastName} {child.firstName}
+                    </span>
+                    <input
+                      type="text"
+                      name={`time-${child.id}`}
+                      placeholder="32.45"
+                      className="w-28 rounded-lg border border-white/15 bg-brand-base/60 px-3 py-1.5 text-sm outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex justify-end">
+                <SaveButton>Сохранить курсовку</SaveButton>
+              </div>
+            </form>
+          )}
         </CardBody>
       </Card>
 

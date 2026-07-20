@@ -94,6 +94,26 @@ export async function athleteLoginAction(
     athlete = await prisma.athlete.create({ data: { lastName, firstName, birthDate } });
   }
 
+  // Само-исцеляющаяся привязка к "Ребёнку" из обычных групп — тот же человек
+  // может быть одновременно в "Детях" и в "Спортсменах"; совпадение ФИО+даты
+  // рождения уже принято в проекте как достаточный идентификатор (см. вход
+  // родителя/спортсмена). Проверяем на каждый вход, пока привязка не найдена.
+  if (!athlete.linkedChildId) {
+    const child = await prisma.child.findFirst({
+      where: {
+        lastName: { equals: lastName, mode: "insensitive" },
+        firstName: { equals: firstName, mode: "insensitive" },
+        birthDate,
+      },
+    });
+    if (child) {
+      athlete = await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: { linkedChildId: child.id },
+      });
+    }
+  }
+
   await setSessionCookie({ role: "athlete", athleteId: athlete.id });
   redirect("/athlete");
 }

@@ -2,14 +2,62 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireHeadTrainer } from "@/lib/auth";
+import { requireAthlete, requireHeadTrainer } from "@/lib/auth";
 import { ATHLETE_LEVEL_ORDER } from "@/lib/labels";
-import type { GroupLevel } from "@prisma/client";
+import { parseDateInputValue } from "@/lib/dates";
+import type { GroupLevel, TrainingLogType } from "@prisma/client";
 
 function revalidateLevelsPath() {
   revalidatePath("/trainer/athlete-levels");
   revalidatePath("/athlete");
   revalidatePath("/athlete/trainings");
+}
+
+const VALID_LOG_TYPES: TrainingLogType[] = ["OFP", "FLEXIBILITY"];
+
+/** Отметка выполнения задания по уровню — уходит в архив, хранится вечно,
+ * level фиксируется на момент отметки (снимок, не ссылка). */
+export async function logLevelTrainingAction(formData: FormData) {
+  const athlete = await requireAthlete();
+  const typeRaw = String(formData.get("type") ?? "");
+  const dateStr = String(formData.get("date") ?? "");
+  const durationMinutes = Number(formData.get("durationMinutes") ?? "");
+  const done = formData.get("done") === "on";
+
+  if (!VALID_LOG_TYPES.includes(typeRaw as TrainingLogType)) {
+    throw new Error("Неизвестный тип задания");
+  }
+  if (!done || !dateStr || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    throw new Error("Отметьте «Выполнено» и укажите дату и время выполнения");
+  }
+
+  const current = await prisma.athlete.findUnique({
+    where: { id: athlete.id },
+    select: { level: true },
+  });
+  if (!current?.level) {
+    throw new Error("Уровень пока не назначен, обратитесь к тренеру");
+  }
+
+  await prisma.levelTrainingLog.create({
+    data: {
+      athleteId: athlete.id,
+      level: current.level,
+      type: typeRaw as TrainingLogType,
+      date: parseDateInputValue(dateStr),
+      durationMinutes: Math.round(durationMinutes),
+    },
+  });
+  revalidateLevelsPath();
+}
+
+export async function deleteLevelTrainingLogAction(formData: FormData) {
+  const athlete = await requireAthlete();
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Не найдена запись");
+
+  await prisma.levelTrainingLog.deleteMany({ where: { id, athleteId: athlete.id } });
+  revalidateLevelsPath();
 }
 
 /** Назначение уровня спортсмену — так же, как в "Отработках": главный тренер

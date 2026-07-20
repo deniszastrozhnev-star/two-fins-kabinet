@@ -7,6 +7,7 @@ import type {
   GroupLevel,
   TimingType,
   TrainerRole,
+  TrainingLogType,
 } from "@prisma/client";
 
 export const LEVEL_LABELS: Record<GroupLevel, string> = {
@@ -118,3 +119,12 @@ export const GENDER_LABELS: Record<Gender, string> = {
   MALE: "Мужской",
   FEMALE: "Женский",
 };
+
+export const TRAINING_LOG_TYPE_LABELS: Record<TrainingLogType, string> = {
+  OFP: "ОФП",
+  FLEXIBILITY: "Гибкость",
+};
+
+// Общий список дистанций для «Курсовки» — и у тренера (Посещаемость), и у
+// спортсмена (Тренировка в бассейне).
+export const COURSE_DISTANCES = ["25 м", "50 м", "100 м", "200 м", "400 м"] as const;

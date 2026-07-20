@@ -6,9 +6,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TrainerForm } from "@/components/trainer/TrainerForm";
+import { DeleteTrainerButton } from "@/components/trainer/DeleteTrainerButton";
 
 export default async function TeamPage() {
-  await requireHeadTrainer();
+  const currentTrainer = await requireHeadTrainer();
 
   const trainers = await prisma.trainer.findMany({
     orderBy: [{ role: "asc" }, { username: "asc" }],
@@ -35,9 +36,14 @@ export default async function TeamPage() {
                     В команде с {formatDateRu(t.createdAt)}
                   </p>
                 </div>
-                <Badge tone={t.role === "HEAD" ? "violet" : "neutral"}>
-                  {TRAINER_ROLE_LABELS[t.role]}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge tone={t.role === "HEAD" ? "violet" : "neutral"}>
+                    {TRAINER_ROLE_LABELS[t.role]}
+                  </Badge>
+                  {t.id !== currentTrainer.id && (
+                    <DeleteTrainerButton id={t.id} username={t.username} />
+                  )}
+                </div>
               </div>
             ))}
           </CardBody>

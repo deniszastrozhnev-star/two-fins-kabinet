@@ -134,7 +134,9 @@ export default async function TrainerAthletesPage({
                       {period === "month" && i === 0 ? "🏆" : i + 1}
                     </td>
                     <td className="px-4 py-3 font-medium sm:px-5">
-                      {row.lastName} {row.firstName}
+                      <Link href={`/trainer/athletes/${row.athleteId}`} className="hover:underline">
+                        {row.lastName} {row.firstName}
+                      </Link>
                       {rank && (
                         <span
                           className="ml-2 text-xs font-semibold"

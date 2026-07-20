@@ -41,3 +41,41 @@ export async function createTrainerAction(
   revalidatePath("/trainer/team");
   return { success: `Тренер «${username}» добавлен` };
 }
+
+export async function deleteTrainerAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const current = await requireHeadTrainer();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Не найден тренер" };
+
+  if (id === current.id) {
+    return { error: "Нельзя удалить самого себя" };
+  }
+
+  const target = await prisma.trainer.findUnique({ where: { id } });
+  if (!target) return { error: "Не найден тренер" };
+
+  if (target.role === "HEAD") {
+    const headCount = await prisma.trainer.count({ where: { role: "HEAD" } });
+    if (headCount <= 1) {
+      return { error: "Нельзя удалить последнего главного тренера" };
+    }
+  }
+
+  const [attendanceCount, personalTrainingCount] = await Promise.all([
+    prisma.attendanceRecord.count({ where: { markedByTrainerId: id } }),
+    prisma.personalTraining.count({ where: { trainerId: id } }),
+  ]);
+  if (attendanceCount > 0 || personalTrainingCount > 0) {
+    return {
+      error:
+        "Нельзя удалить тренера с историей посещаемости или персональных тренировок — она нужна для отчётов и зарплаты",
+    };
+  }
+
+  await prisma.trainer.delete({ where: { id } });
+  revalidatePath("/trainer/team");
+  return { success: `Тренер «${target.username}» удалён` };
+}

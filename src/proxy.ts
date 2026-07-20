@@ -34,19 +34,27 @@ export async function proxy(request: NextRequest) {
   const session = await verifySession(token);
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/trainer") && session?.role !== "trainer") {
+  // Важно: сравнение по границе сегмента пути, а не startsWith — иначе
+  // "/athlete-login".startsWith("/athlete") тоже true, и страницу входа
+  // спортсмена (как и "/parent-login" для родителя) редиректило бы саму на
+  // себя в бесконечном цикле. Актуально с тех пор, как matcher расширили на
+  // все пути ради канонизации хоста — раньше более узкий matcher
+  // ("/athlete/:path*") эту ситуацию просто не пропускал до этой проверки.
+  const inSection = (section: string) => pathname === section || pathname.startsWith(`${section}/`);
+
+  if (inSection("/trainer") && session?.role !== "trainer") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith("/parent") && session?.role !== "parent") {
+  if (inSection("/parent") && session?.role !== "parent") {
     const url = request.nextUrl.clone();
     url.pathname = "/parent-login";
     return NextResponse.redirect(url);
   }
 
-  if (pathname.startsWith("/athlete") && session?.role !== "athlete") {
+  if (inSection("/athlete") && session?.role !== "athlete") {
     const url = request.nextUrl.clone();
     url.pathname = "/athlete-login";
     return NextResponse.redirect(url);
