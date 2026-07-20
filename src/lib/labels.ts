@@ -18,6 +18,9 @@ export const LEVEL_LABELS: Record<GroupLevel, string> = {
 
 export const LEVEL_ORDER: GroupLevel[] = ["NOVICE", "CONFIDENT", "SPORT", "TEAM"];
 
+// Уровни спортсменов используют те же 3 значения, что и группы — но без "Сборной школы".
+export const ATHLETE_LEVEL_ORDER: GroupLevel[] = ["NOVICE", "CONFIDENT", "SPORT"];
+
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   PRESENT: "Пришёл",
   ABSENT: "Не пришёл",

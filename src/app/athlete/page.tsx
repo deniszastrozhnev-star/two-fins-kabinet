@@ -14,7 +14,8 @@ import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
 import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
 import { getSuggestedRankForAthlete } from "@/lib/rankStandards";
 import { formatDateRu } from "@/lib/dates";
-import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
+import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS, LEVEL_LABELS } from "@/lib/labels";
+import Link from "next/link";
 
 export default async function AthletePage() {
   const athlete = await requireAthlete();
@@ -179,8 +180,13 @@ export default async function AthletePage() {
           <h2 className="mb-1 font-heading text-lg font-bold">Мой уровень</h2>
           {level ? (
             <>
-              <p className="text-sm font-medium text-brand-cyan">{level.name}</p>
-              <p className="mt-1 text-sm text-brand-text/70">{level.ofpTask}</p>
+              <p className="text-sm font-medium text-brand-cyan">{LEVEL_LABELS[level]}</p>
+              <p className="mt-1 text-sm text-brand-text/60">
+                Задания по ОФП и гибкости — в разделе{" "}
+                <Link href="/athlete/trainings" className="text-brand-cyan hover:underline">
+                  «Тренировки»
+                </Link>
+              </p>
             </>
           ) : (
             <p className="text-sm text-brand-text/50">

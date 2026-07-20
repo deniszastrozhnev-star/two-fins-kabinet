@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 
 const LINKS = [
   { href: "/athlete", label: "Дневник", exact: true },
+  { href: "/athlete/trainings", label: "Тренировки" },
   { href: "/athlete/competitions", label: "Соревнования" },
   { href: "/athlete/rank-standards", label: "Разряды" },
   { href: "/athlete/rating", label: "Рейтинг" },

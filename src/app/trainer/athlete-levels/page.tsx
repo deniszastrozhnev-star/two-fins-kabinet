@@ -1,78 +1,45 @@
 import { prisma } from "@/lib/prisma";
 import { requireHeadTrainer } from "@/lib/auth";
-import {
-  createAthleteLevelAction,
-  updateAthleteLevelAction,
-  deleteAthleteLevelAction,
-} from "@/lib/actions/athlete-level-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AthleteLevelForm } from "@/components/trainer/AthleteLevelForm";
+import { LevelTrainingForm } from "@/components/trainer/LevelTrainingForm";
 import { AssignAthleteLevelSelect } from "@/components/trainer/AssignAthleteLevelSelect";
-import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
+import { ATHLETE_LEVEL_ORDER, LEVEL_LABELS } from "@/lib/labels";
 
 export default async function AthleteLevelsPage() {
   await requireHeadTrainer();
 
-  const [levels, athletes] = await Promise.all([
-    prisma.athleteLevel.findMany({ orderBy: { createdAt: "asc" } }),
+  const [trainings, athletes] = await Promise.all([
+    prisma.levelTraining.findMany(),
     prisma.athlete.findMany({
-      select: { id: true, lastName: true, firstName: true, levelId: true },
+      select: { id: true, lastName: true, firstName: true, level: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
   ]);
+
+  const trainingByLevel = new Map(trainings.map((t) => [t.level, t]));
 
   return (
     <>
       <PageHeader
         title="Тренировки"
-        description="Уровни спортсменов и задания по ОФП — отдельно от уровней групп"
+        description="Задания по ОФП и гибкости для каждого уровня + уровень спортсмена"
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardBody>
-              <h2 className="mb-3 font-heading text-lg font-bold">Добавить уровень</h2>
-              <AthleteLevelForm action={createAthleteLevelAction} submitLabel="Добавить" />
-            </CardBody>
-          </Card>
-
-          {levels.length === 0 ? (
-            <Card>
-              <CardBody>
-                <EmptyState
-                  title="Уровней пока нет"
-                  description="Добавьте первый уровень выше — например, «Начальный» или «Продвинутый»"
-                />
-              </CardBody>
-            </Card>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {levels.map((level) => (
-                <Card key={level.id}>
-                  <CardBody>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="font-heading text-base font-bold">{level.name}</h3>
-                      <form action={deleteAthleteLevelAction}>
-                        <input type="hidden" name="id" value={level.id} />
-                        <ConfirmSubmitButton
-                          confirmMessage={`Удалить уровень «${level.name}»? Спортсмены на этом уровне останутся без уровня.`}
-                        >
-                          Удалить
-                        </ConfirmSubmitButton>
-                      </form>
-                    </div>
-                    <AthleteLevelForm
-                      action={updateAthleteLevelAction}
-                      initial={{ id: level.id, name: level.name, ofpTask: level.ofpTask }}
-                    />
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
-          )}
+        <div className="flex flex-col gap-4">
+          {ATHLETE_LEVEL_ORDER.map((level) => {
+            const training = trainingByLevel.get(level);
+            return (
+              <Card key={level}>
+                <CardBody>
+                  <h3 className="mb-3 font-heading text-base font-bold">{LEVEL_LABELS[level]}</h3>
+                  <LevelTrainingForm level={level} initial={training ?? undefined} />
+                </CardBody>
+              </Card>
+            );
+          })}
         </div>
 
         <Card>
@@ -97,11 +64,7 @@ export default async function AthleteLevelsPage() {
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-brand-text/50">Уровень:</span>
-                      <AssignAthleteLevelSelect
-                        athleteId={a.id}
-                        currentLevelId={a.levelId}
-                        levels={levels}
-                      />
+                      <AssignAthleteLevelSelect athleteId={a.id} currentLevel={a.level} />
                     </div>
                   </li>
                 ))}

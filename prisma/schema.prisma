@@ -223,15 +223,14 @@ enum Gender {
 // регистрация по фамилии+имени+дате рождения (дата = пароль), без связи с
 // разделом "Дети"/группами/посещаемостью.
 model Athlete {
-  id        String        @id @default(cuid())
+  id        String       @id @default(cuid())
   lastName  String
   firstName String
-  birthDate DateTime      @db.Date
-  levelId   String?
-  level     AthleteLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
+  birthDate DateTime     @db.Date
+  level     GroupLevel? // те же 3 значения, что и у групп (Новичок/Уверенный/Спорт группа); назначает главный тренер
   rank      AthleteRank?
   gender    Gender?
-  createdAt DateTime      @default(now())
+  createdAt DateTime     @default(now())
 
   poolWorkouts        PoolWorkout[]
   gymWorkouts         GymWorkout[]
@@ -241,16 +240,15 @@ model Athlete {
   @@index([lastName, firstName])
 }
 
-// Уровни спортсменов — отдельная сущность, которую ведёт главный тренер;
-// никак не связана с уровнями групп (GroupLevel) в разделе "Дети".
-model AthleteLevel {
-  id        String   @id @default(cuid())
-  name      String
-  ofpTask   String // задание по ОФП для этого уровня
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  athletes Athlete[]
+// Задания по уровням для спортсменов (ОФП + Гибкость) — редактирует главный тренер
+// на странице "Тренировки". Ровно по одной записи на уровень (Новичок/Уверенный/
+// Спорт группа), ключ — GroupLevel, та же классификация, что у групп в разделе "Дети".
+model LevelTraining {
+  id              String     @id @default(cuid())
+  level           GroupLevel @unique
+  ofpTask         String
+  flexibilityTask String
+  updatedAt       DateTime   @updatedAt
 }
 
 model PoolWorkout {
