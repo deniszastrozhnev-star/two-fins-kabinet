@@ -1,7 +1,7 @@
 import "server-only";
 import sharp from "sharp";
 
-const MAX_WIDTH = 1600;
+const DEFAULT_MAX_WIDTH = 1600;
 
 /**
  * Уменьшает фото (телефонные снимки чеков/справок бывают по несколько МБ) до разумной
@@ -10,6 +10,7 @@ const MAX_WIDTH = 1600;
  */
 export async function resizeForUpload(
   file: File,
+  maxWidth: number = DEFAULT_MAX_WIDTH,
 ): Promise<{ buffer: Buffer; contentType: string }> {
   const arrayBuffer = await file.arrayBuffer();
   const original = Buffer.from(arrayBuffer);
@@ -21,7 +22,7 @@ export async function resizeForUpload(
   try {
     const resized = await sharp(original)
       .rotate() // учитывает EXIF-поворот с телефона
-      .resize({ width: MAX_WIDTH, withoutEnlargement: true })
+      .resize({ width: maxWidth, withoutEnlargement: true })
       .jpeg({ quality: 82 })
       .toBuffer();
     // Копируем в свежий Buffer: память из нативного аддона sharp иногда не проходит

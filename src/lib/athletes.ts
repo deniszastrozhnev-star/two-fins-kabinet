@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import {
   startOfWeek,
   endOfWeek,
@@ -49,7 +50,7 @@ export function computeAthletePoints(volumeMeters: number, gymMinutes: number): 
  * этот день". Штраф не начисляется за дни до регистрации спортсмена и за
  * ещё не наступившие дни периода.
  */
-export async function getAthleteLeaderboard(
+export const getAthleteLeaderboard = cache(async function getAthleteLeaderboard(
   period: AthletePeriod,
   reference = new Date(),
 ): Promise<AthleteRankRow[]> {
@@ -146,4 +147,4 @@ export async function getAthleteLeaderboard(
 
   rows.sort((a, b) => b.points - a.points);
   return rows;
-}
+});

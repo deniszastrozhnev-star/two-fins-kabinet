@@ -228,6 +228,7 @@ model Athlete {
   lastName      String
   firstName     String
   birthDate     DateTime     @db.Date
+  avatarUrl     String? // фото профиля, публичный URL в Vercel Blob
   level         GroupLevel? // те же 3 значения, что и у групп (Новичок/Уверенный/Спорт группа); назначает главный тренер
   rank          AthleteRank?
   gender        Gender?
@@ -243,8 +244,31 @@ model Athlete {
   flexibilityWorkouts FlexibilityWorkout[]
   competitionResults  AthleteCompetitionResult[]
   levelTrainingLogs   LevelTrainingLog[]
+  stories             AthleteStory[]
 
   @@index([lastName, firstName])
+}
+
+enum StoryMediaType {
+  PHOTO
+  VIDEO
+}
+
+// "Истории" — фото/видео (одно на историю) + опциональная подпись, живут 24 часа
+// (фильтр по createdAt при чтении, без отдельного expiresAt и без фоновой очистки —
+// простой просмотр, без лайков/просмотров/комментариев). Удалить может автор или
+// любой тренер (модерация).
+model AthleteStory {
+  id        String         @id @default(cuid())
+  athleteId String
+  athlete   Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  mediaUrl  String
+  mediaType StoryMediaType
+  caption   String?
+  createdAt DateTime       @default(now())
+
+  @@index([athleteId])
+  @@index([createdAt])
 }
 
 // Задания по уровням для спортсменов (ОФП + Гибкость) — редактирует главный тренер

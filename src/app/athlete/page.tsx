@@ -10,11 +10,8 @@ import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
-import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
-import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
-import { getSuggestedRankForAthlete } from "@/lib/rankStandards";
 import { formatDateRu } from "@/lib/dates";
-import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS, LEVEL_LABELS } from "@/lib/labels";
+import { LEVEL_LABELS } from "@/lib/labels";
 import Link from "next/link";
 
 export default async function AthletePage() {
@@ -32,7 +29,7 @@ export default async function AthletePage() {
       }),
       prisma.athlete.findUnique({
         where: { id: athlete.id },
-        select: { level: true, rank: true, gender: true, linkedChildId: true },
+        select: { level: true, linkedChildId: true },
       }),
     ]);
 
@@ -41,9 +38,6 @@ export default async function AthletePage() {
   const weekRow = weekIndex >= 0 ? weekBoard[weekIndex] : null;
   const monthRow = monthIndex >= 0 ? monthBoard[monthIndex] : null;
   const level = athleteExtra?.level ?? null;
-  const rank = athleteExtra?.rank ?? null;
-  const gender = athleteExtra?.gender ?? null;
-  const suggestedRank = await getSuggestedRankForAthlete(athlete.id, gender);
 
   const history = [
     ...poolWorkouts.map((w) => ({
@@ -74,40 +68,6 @@ export default async function AthletePage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-col items-center gap-3 text-center">
-        {rank ? (
-          <p
-            className="font-heading text-3xl font-bold sm:text-4xl"
-            style={{
-              color: ATHLETE_RANK_COLORS[rank],
-              textShadow: `0 0 12px ${ATHLETE_RANK_COLORS[rank]}, 0 0 32px ${ATHLETE_RANK_COLORS[rank]}`,
-            }}
-          >
-            {ATHLETE_RANK_LABELS[rank]}
-          </p>
-        ) : (
-          <p className="text-sm text-brand-text/50">Укажи свой разряд</p>
-        )}
-        <AthleteRankSelect currentRank={rank} />
-
-        {suggestedRank && (
-          <p className="text-sm text-brand-text/60">
-            По результатам соревнований:{" "}
-            <span className="font-semibold" style={{ color: ATHLETE_RANK_COLORS[suggestedRank] }}>
-              {ATHLETE_RANK_LABELS[suggestedRank]}
-            </span>{" "}
-            — при желании укажи в «Мой разряд» выше
-          </p>
-        )}
-
-        <div className="flex items-center gap-2">
-          {!gender && (
-            <p className="text-xs text-brand-text/50">Укажи пол, чтобы видеть подсказку по разряду:</p>
-          )}
-          <AthleteGenderSelect currentGender={gender} />
-        </div>
-      </div>
-
       <PageHeader title="Дневник" description="Добавь тренировку и следи за своими показателями" />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
