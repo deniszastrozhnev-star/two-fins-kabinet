@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { deleteStoryAction } from "@/lib/actions/athlete-profile-actions";
 import type { StoryWithAuthor } from "@/lib/stories";
 
-const PHOTO_DURATION_MS = 5000;
+const PHOTO_DURATION_MS = 7000;
 
 export function StoryViewer({
   stories,
