@@ -12,15 +12,19 @@ enum TrainerRole {
 }
 
 model Trainer {
-  id           String      @id @default(cuid())
-  username     String      @unique
+  id           String       @id @default(cuid())
+  username     String       @unique
   passwordHash String
-  role         TrainerRole @default(TRAINER)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  role         TrainerRole  @default(TRAINER)
+  avatarUrl    String?
+  bio          String?
+  rank         AthleteRank? // личный разряд тренера по плаванию — тот же enum, что у спортсменов
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   attendanceRecords AttendanceRecord[]
   personalTrainings PersonalTraining[]
+  groups            Group[] @relation("TrainerGroups")
 }
 
 enum GroupLevel {
@@ -47,6 +51,7 @@ model Group {
   workoffCloses            AttendanceRecord[]        @relation("WorkoffClosesGroup")
   waitlist                 GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
+  trainers                 Trainer[]                 @relation("TrainerGroups")
 }
 
 enum ChildStatus {

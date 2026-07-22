@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireHeadTrainer } from "@/lib/auth";
+import { requireTrainer } from "@/lib/auth";
 import { getAthleteLeaderboard, AthletePeriod } from "@/lib/athletes";
 import { getAllAthleteRecords } from "@/lib/athleteCompetitions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -18,7 +18,7 @@ export default async function TrainerAthletesPage({
 }: {
   searchParams: Promise<{ period?: string }>;
 }) {
-  await requireHeadTrainer();
+  await requireTrainer();
   const { period: periodParam } = await searchParams;
   const period: AthletePeriod = periodParam === "month" ? "month" : "week";
 

@@ -79,3 +79,21 @@ export async function deleteTrainerAction(
   revalidatePath("/trainer/team");
   return { success: `Тренер «${target.username}» удалён` };
 }
+
+/** Закреплённые группы тренера — просто пометка "своих" групп, доступ к
+ * отметке посещаемости/отработкам в других группах не ограничивает. */
+export async function assignTrainerGroupsAction(formData: FormData) {
+  await requireHeadTrainer();
+  const trainerId = String(formData.get("trainerId") ?? "");
+  if (!trainerId) throw new Error("Не найден тренер");
+
+  const groupIds = formData.getAll("groupIds").map(String);
+  await prisma.trainer.update({
+    where: { id: trainerId },
+    data: { groups: { set: groupIds.map((id) => ({ id })) } },
+  });
+
+  revalidatePath("/trainer/team");
+  revalidatePath("/trainer");
+  revalidatePath("/parent/trainers");
+}

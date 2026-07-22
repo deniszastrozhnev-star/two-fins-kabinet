@@ -4,6 +4,9 @@ import { requireTrainer } from "@/lib/auth";
 import { formatDateRu } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { TrainerAvatarUpload } from "@/components/trainer/TrainerAvatarUpload";
+import { TrainerProfileForm } from "@/components/trainer/TrainerProfileForm";
 
 const QUICK_LINKS = [
   { href: "/trainer/attendance", label: "Посещаемость", desc: "Отметить занятие" },
@@ -22,7 +25,7 @@ export default async function TrainerDashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [childrenCount, groupsCount, overdueCount, upcomingEvents] =
+  const [childrenCount, groupsCount, overdueCount, upcomingEvents, myGroups] =
     await Promise.all([
       prisma.child.count(),
       prisma.group.count(),
@@ -34,7 +37,12 @@ export default async function TrainerDashboardPage() {
         orderBy: { dateStart: "asc" },
         take: 3,
       }),
+      prisma.group.findMany({
+        where: { trainers: { some: { id: trainer.id } } },
+        orderBy: { name: "asc" },
+      }),
     ]);
+  const avatarUrl = trainer.avatarUrl ? `/api/trainer-avatars/${trainer.id}` : null;
 
   return (
     <>
@@ -42,6 +50,36 @@ export default async function TrainerDashboardPage() {
         title={`Здравствуйте, ${trainer.username}`}
         description="Быстрый обзор школы"
       />
+
+      <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_2fr]">
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 font-heading text-lg font-bold">Мой профиль</h2>
+            <div className="flex justify-center pb-4">
+              <TrainerAvatarUpload name={trainer.username} url={avatarUrl} size={96} />
+            </div>
+            <TrainerProfileForm bio={trainer.bio} rank={trainer.rank} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 font-heading text-lg font-bold">Мои группы</h2>
+            {myGroups.length === 0 ? (
+              <p className="text-sm text-brand-text/50">
+                Пока не закреплено ни одной группы — обратитесь к главному тренеру
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {myGroups.map((g) => (
+                  <Badge key={g.id} tone="cyan">
+                    {g.name} · {g.pool}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <Card>

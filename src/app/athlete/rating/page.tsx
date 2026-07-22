@@ -70,7 +70,9 @@ export default async function AthleteRatingPage({
                       {period === "month" && i === 0 ? "🏆" : i + 1}
                     </td>
                     <td className="px-4 py-3 font-medium sm:px-5">
-                      {row.lastName} {row.firstName}
+                      <Link href={`/athlete/profile/${row.athleteId}`} className="hover:underline">
+                        {row.lastName} {row.firstName}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 sm:px-5">{row.poolVolumeMeters} м</td>
                     <td className="px-4 py-3 sm:px-5">{row.gymMinutes} мин</td>

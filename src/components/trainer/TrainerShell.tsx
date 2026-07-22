@@ -12,6 +12,7 @@ const BASE_LINKS: NavLinkDef[] = [
   { href: "/trainer/personal-trainings", label: "Персональные тренировки" },
   { href: "/trainer/rank-standards", label: "Разряды" },
   { href: "/trainer/stories", label: "Истории" },
+  { href: "/trainer/athletes", label: "Спортсмены" },
   { href: "/trainer/events", label: "Новости и события" },
   { href: "/trainer/settings", label: "Настройки" },
 ];
@@ -21,7 +22,6 @@ const HEAD_ONLY_LINKS: NavLinkDef[] = [
   { href: "/trainer/report", label: "Отчёт" },
   { href: "/trainer/cold-children", label: "Холодные дети" },
   { href: "/trainer/metrics", label: "Показатели" },
-  { href: "/trainer/athletes", label: "Спортсмены" },
   { href: "/trainer/athlete-levels", label: "Тренировки" },
 ];
 

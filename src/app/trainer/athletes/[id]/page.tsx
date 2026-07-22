@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireHeadTrainer } from "@/lib/auth";
+import { requireTrainer } from "@/lib/auth";
 import { getAthleteCompetitionHistory } from "@/lib/athleteCompetitions";
 import { deleteAthleteAction } from "@/lib/actions/athlete-delete-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -22,7 +22,7 @@ export default async function TrainerAthleteDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireHeadTrainer();
+  const trainer = await requireTrainer();
   const { id } = await params;
 
   const athlete = await prisma.athlete.findUnique({ where: { id } });
@@ -191,24 +191,26 @@ export default async function TrainerAthleteDetailPage({
           </CardBody>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardBody className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Удалить спортсмена</p>
-              <p className="text-xs text-brand-text/50">
-                Вместе со спортсменом удалятся все его записи дневника, соревнований и архива
-              </p>
-            </div>
-            <form action={deleteAthleteAction}>
-              <input type="hidden" name="id" value={athlete.id} />
-              <ConfirmSubmitButton
-                confirmMessage={`Удалить ${athlete.lastName} ${athlete.firstName}? Это действие нельзя отменить.`}
-              >
-                Удалить
-              </ConfirmSubmitButton>
-            </form>
-          </CardBody>
-        </Card>
+        {trainer.role === "HEAD" && (
+          <Card className="lg:col-span-2">
+            <CardBody className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Удалить спортсмена</p>
+                <p className="text-xs text-brand-text/50">
+                  Вместе со спортсменом удалятся все его записи дневника, соревнований и архива
+                </p>
+              </div>
+              <form action={deleteAthleteAction}>
+                <input type="hidden" name="id" value={athlete.id} />
+                <ConfirmSubmitButton
+                  confirmMessage={`Удалить ${athlete.lastName} ${athlete.firstName}? Это действие нельзя отменить.`}
+                >
+                  Удалить
+                </ConfirmSubmitButton>
+              </form>
+            </CardBody>
+          </Card>
+        )}
       </div>
     </>
   );
