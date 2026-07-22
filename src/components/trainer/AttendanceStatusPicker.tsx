@@ -30,14 +30,14 @@ export function AttendanceStatusPicker({
       {OPTIONS.map((opt) => (
         <label
           key={opt.value}
-          className={`cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 transition ${opt.on}`}
+          className={`relative cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 transition ${opt.on}`}
         >
           <input
             type="radio"
             name={name}
             value={opt.value}
             defaultChecked={defaultValue === opt.value}
-            className="sr-only"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           />
           {opt.label}
         </label>

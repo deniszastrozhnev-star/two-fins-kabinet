@@ -27,14 +27,14 @@ function GroupOption({
   onChange: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm transition has-[:checked]:border-brand-cyan/50 has-[:checked]:bg-brand-cyan/10">
+    <label className="relative flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm transition has-[:checked]:border-brand-cyan/50 has-[:checked]:bg-brand-cyan/10">
       <input
         type="radio"
         name={name}
         value={group.id}
         checked={checked}
         onChange={onChange}
-        className="sr-only"
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />
       <span>
         <span className="font-medium">{group.name}</span>

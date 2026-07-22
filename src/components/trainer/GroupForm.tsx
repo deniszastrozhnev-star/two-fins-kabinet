@@ -49,14 +49,14 @@ export function GroupForm({
           {WEEKDAYS.map((day) => (
             <label
               key={day}
-              className="cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan"
+              className="relative cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan"
             >
               <input
                 type="checkbox"
                 name="daysOfWeek"
                 value={day}
                 defaultChecked={initial?.daysOfWeek?.includes(day)}
-                className="sr-only"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               />
               {day}
             </label>

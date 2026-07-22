@@ -31,25 +31,25 @@ export function PersonalTrainingForm({
           Кто пришёл
         </span>
         <div className="flex gap-1.5">
-          <label className="cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan">
+          <label className="relative cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan">
             <input
               type="radio"
               name="personType"
               value="CHILD"
               checked={personType === "CHILD"}
               onChange={() => setPersonType("CHILD")}
-              className="sr-only"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
             Ребёнок из базы
           </label>
-          <label className="cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan">
+          <label className="relative cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 has-[:checked]:bg-brand-cyan/25 has-[:checked]:text-brand-cyan">
             <input
               type="radio"
               name="personType"
               value="ADULT"
               checked={personType === "ADULT"}
               onChange={() => setPersonType("ADULT")}
-              className="sr-only"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
             Взрослый
           </label>
