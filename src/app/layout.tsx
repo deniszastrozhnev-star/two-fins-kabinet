@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Comfortaa } from "next/font/google";
+import { InAppBrowserBanner } from "@/components/InAppBrowserBanner";
 import "./globals.css";
 
 const comfortaa = Comfortaa({
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col relative">
         <div className="brand-shimmer" aria-hidden="true" />
         <div className="relative z-10 flex min-h-full flex-1 flex-col">
+          <InAppBrowserBanner />
           {children}
         </div>
       </body>
