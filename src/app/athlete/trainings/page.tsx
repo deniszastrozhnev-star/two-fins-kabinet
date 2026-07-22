@@ -7,6 +7,7 @@ import {
   deleteLevelTrainingLogAction,
 } from "@/lib/actions/athlete-level-actions";
 import { getTrainingLogHistory } from "@/lib/trainingLog";
+import { getLevelTrainingDates, getLevelTrainingForDate } from "@/lib/levelTraining";
 import { AthletePeriod, getPeriodRange } from "@/lib/athletes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -56,7 +57,7 @@ function MarkDoneForm({ type, label }: { type: "OFP" | "FLEXIBILITY"; label: str
 export default async function AthleteTrainingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; ref?: string }>;
+  searchParams: Promise<{ period?: string; ref?: string; taskDate?: string }>;
 }) {
   const athlete = await requireAthlete();
   const params = await searchParams;
@@ -69,10 +70,14 @@ export default async function AthleteTrainingsPage({
   });
   const level = athleteExtra?.level ?? null;
 
-  const [training, history] = await Promise.all([
-    level ? prisma.levelTraining.findUnique({ where: { level } }) : null,
-    getTrainingLogHistory(athlete.id, period, reference),
-  ]);
+  const taskDates = level ? await getLevelTrainingDates(level) : [];
+  const selectedTaskDateStr = params.taskDate ?? toDateInputValue(taskDates[0]?.date ?? new Date());
+  const training =
+    level && taskDates.length > 0
+      ? await getLevelTrainingForDate(level, parseDateInputValue(selectedTaskDateStr))
+      : null;
+
+  const history = await getTrainingLogHistory(athlete.id, period, reference);
 
   const prevRef = toDateInputValue(
     period === "week" ? subWeeks(reference, 1) : subMonths(reference, 1),
@@ -90,7 +95,7 @@ export default async function AthleteTrainingsPage({
     <>
       <PageHeader
         title="Тренировки"
-        description="Ориентир от тренера по твоему уровню — ОФП и гибкость"
+        description="Ориентир от тренера по твоему уровню — ОФП и гибкость, журнал по дням"
       />
 
       {!level ? (
@@ -109,37 +114,69 @@ export default async function AthleteTrainingsPage({
 
           <Card>
             <CardBody>
-              <h2 className="mb-2 font-heading text-lg font-bold">ОФП</h2>
-              {training?.ofpTask ? (
-                <p className="whitespace-pre-wrap text-sm text-brand-text/80">{training.ofpTask}</p>
+              <h2 className="mb-3 font-heading text-lg font-bold">Задания по дням</h2>
+              {taskDates.length === 0 ? (
+                <EmptyState
+                  title="Заданий пока нет"
+                  description="Тренер ещё не добавил ни одного задания для твоего уровня"
+                />
               ) : (
-                <p className="text-sm text-brand-text/50">Задание пока не добавлено</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {taskDates.map((d) => {
+                    const ds = toDateInputValue(d.date);
+                    const active = ds === selectedTaskDateStr;
+                    return (
+                      <Link
+                        key={ds}
+                        href={`/athlete/trainings?period=${period}&ref=${toDateInputValue(reference)}&taskDate=${ds}`}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                          active
+                            ? "bg-brand-cyan/20 text-brand-cyan"
+                            : "text-brand-text/60 hover:bg-white/5"
+                        }`}
+                      >
+                        {formatDateRu(d.date, "d MMMM")}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-              <MarkDoneForm type="OFP" label="ОФП" />
             </CardBody>
           </Card>
 
-          <Card>
-            <CardBody>
-              <h2 className="mb-2 font-heading text-lg font-bold">Гибкость</h2>
-              {training?.flexibilityTask ? (
-                <p className="whitespace-pre-wrap text-sm text-brand-text/80">
-                  {training.flexibilityTask}
-                </p>
-              ) : (
-                <p className="text-sm text-brand-text/50">Задание пока не добавлено</p>
-              )}
-              <MarkDoneForm type="FLEXIBILITY" label="Гибкость" />
-            </CardBody>
-          </Card>
+          {training && (
+            <>
+              <Card>
+                <CardBody>
+                  <h2 className="mb-2 font-heading text-lg font-bold">
+                    ОФП · {formatDateRu(training.date)}
+                  </h2>
+                  <p className="whitespace-pre-wrap text-sm text-brand-text/80">{training.ofpTask}</p>
+                  <MarkDoneForm type="OFP" label="ОФП" />
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardBody>
+                  <h2 className="mb-2 font-heading text-lg font-bold">
+                    Гибкость · {formatDateRu(training.date)}
+                  </h2>
+                  <p className="whitespace-pre-wrap text-sm text-brand-text/80">
+                    {training.flexibilityTask}
+                  </p>
+                  <MarkDoneForm type="FLEXIBILITY" label="Гибкость" />
+                </CardBody>
+              </Card>
+            </>
+          )}
 
           <Card>
             <CardBody>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-heading text-lg font-bold">История</h2>
+                <h2 className="font-heading text-lg font-bold">История отметок</h2>
                 <div className="flex gap-1.5">
                   <Link
-                    href={`/athlete/trainings?period=week&ref=${toDateInputValue(new Date())}`}
+                    href={`/athlete/trainings?period=week&ref=${toDateInputValue(new Date())}&taskDate=${selectedTaskDateStr}`}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       period === "week"
                         ? "bg-brand-cyan/20 text-brand-cyan"
@@ -149,7 +186,7 @@ export default async function AthleteTrainingsPage({
                     Неделя
                   </Link>
                   <Link
-                    href={`/athlete/trainings?period=month&ref=${toDateInputValue(new Date())}`}
+                    href={`/athlete/trainings?period=month&ref=${toDateInputValue(new Date())}&taskDate=${selectedTaskDateStr}`}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       period === "month"
                         ? "bg-brand-cyan/20 text-brand-cyan"
@@ -163,14 +200,14 @@ export default async function AthleteTrainingsPage({
 
               <div className="mb-3 flex items-center justify-between gap-3">
                 <Link
-                  href={`/athlete/trainings?period=${period}&ref=${prevRef}`}
+                  href={`/athlete/trainings?period=${period}&ref=${prevRef}&taskDate=${selectedTaskDateStr}`}
                   className="rounded-lg px-3 py-1.5 text-sm text-brand-text/60 hover:bg-white/5"
                 >
                   ← Раньше
                 </Link>
                 <span className="text-sm font-medium capitalize">{periodLabel}</span>
                 <Link
-                  href={`/athlete/trainings?period=${period}&ref=${nextRef}`}
+                  href={`/athlete/trainings?period=${period}&ref=${nextRef}&taskDate=${selectedTaskDateStr}`}
                   className="rounded-lg px-3 py-1.5 text-sm text-brand-text/60 hover:bg-white/5"
                 >
                   Позже →

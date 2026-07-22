@@ -4,39 +4,57 @@ import { requireHeadTrainer } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { LevelTrainingForm } from "@/components/trainer/LevelTrainingForm";
 import { AssignAthleteLevelSelect } from "@/components/trainer/AssignAthleteLevelSelect";
+import { formatDateRu } from "@/lib/dates";
 import { ATHLETE_LEVEL_ORDER, LEVEL_LABELS } from "@/lib/labels";
 
 export default async function AthleteLevelsPage() {
   await requireHeadTrainer();
 
-  const [trainings, athletes] = await Promise.all([
-    prisma.levelTraining.findMany(),
+  const [latestTrainings, athletes] = await Promise.all([
+    prisma.levelTraining.findMany({ orderBy: { date: "desc" } }),
     prisma.athlete.findMany({
       select: { id: true, lastName: true, firstName: true, level: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
   ]);
 
-  const trainingByLevel = new Map(trainings.map((t) => [t.level, t]));
+  // Самая свежая запись по каждому уровню — для превью на обзорной карточке.
+  const latestByLevel = new Map<string, (typeof latestTrainings)[number]>();
+  for (const t of latestTrainings) {
+    if (!latestByLevel.has(t.level)) latestByLevel.set(t.level, t);
+  }
 
   return (
     <>
       <PageHeader
         title="Тренировки"
-        description="Задания по ОФП и гибкости для каждого уровня + уровень спортсмена"
+        description="Журнал заданий по ОФП и гибкости по дням для каждого уровня + уровень спортсмена"
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           {ATHLETE_LEVEL_ORDER.map((level) => {
-            const training = trainingByLevel.get(level);
+            const latest = latestByLevel.get(level);
             return (
               <Card key={level}>
                 <CardBody>
-                  <h3 className="mb-3 font-heading text-base font-bold">{LEVEL_LABELS[level]}</h3>
-                  <LevelTrainingForm level={level} initial={training ?? undefined} />
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="font-heading text-base font-bold">{LEVEL_LABELS[level]}</h3>
+                    <Link
+                      href={`/trainer/athlete-levels/${level}`}
+                      className="rounded-lg bg-brand-cyan/20 px-3 py-1.5 text-sm font-medium text-brand-cyan transition hover:bg-brand-cyan/30"
+                    >
+                      Открыть журнал →
+                    </Link>
+                  </div>
+                  {latest ? (
+                    <p className="mt-2 text-xs text-brand-text/50">
+                      Последняя запись: {formatDateRu(latest.date)}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-brand-text/50">Записей пока нет</p>
+                  )}
                 </CardBody>
               </Card>
             );

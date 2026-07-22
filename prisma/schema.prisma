@@ -277,14 +277,18 @@ model AthleteStory {
 }
 
 // Задания по уровням для спортсменов (ОФП + Гибкость) — редактирует главный тренер
-// на странице "Тренировки". Ровно по одной записи на уровень (Новичок/Уверенный/
-// Спорт группа), ключ — GroupLevel, та же классификация, что у групп в разделе "Дети".
+// на странице "Тренировки". Журнал по дням: одна запись на пару (уровень, дата) —
+// history сохраняется, а не перезаписывается при добавлении нового дня.
 model LevelTraining {
   id              String     @id @default(cuid())
-  level           GroupLevel @unique
+  level           GroupLevel
+  date            DateTime   @db.Date
   ofpTask         String
   flexibilityTask String
+  createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+
+  @@unique([level, date])
 }
 
 enum TrainingLogType {

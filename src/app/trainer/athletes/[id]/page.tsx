@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
+import { subHours } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { getAthleteCompetitionHistory } from "@/lib/athleteCompetitions";
 import { deleteAthleteAction } from "@/lib/actions/athlete-delete-actions";
+import { deleteStoryAction } from "@/lib/actions/athlete-profile-actions";
+import { ACTIVE_STORY_HOURS } from "@/lib/stories";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -28,7 +31,7 @@ export default async function TrainerAthleteDetailPage({
   const athlete = await prisma.athlete.findUnique({ where: { id } });
   if (!athlete) notFound();
 
-  const [poolWorkouts, gymWorkouts, flexWorkouts, competitions, trainingLogs] =
+  const [poolWorkouts, gymWorkouts, flexWorkouts, competitions, trainingLogs, stories] =
     await Promise.all([
       prisma.poolWorkout.findMany({ where: { athleteId: id }, orderBy: { date: "desc" } }),
       prisma.gymWorkout.findMany({ where: { athleteId: id }, orderBy: { date: "desc" } }),
@@ -38,6 +41,10 @@ export default async function TrainerAthleteDetailPage({
         where: { athleteId: id },
         orderBy: { date: "desc" },
         take: 50,
+      }),
+      prisma.athleteStory.findMany({
+        where: { athleteId: id, createdAt: { gte: subHours(new Date(), ACTIVE_STORY_HOURS) } },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -190,6 +197,50 @@ export default async function TrainerAthleteDetailPage({
             )}
           </CardBody>
         </Card>
+
+        {stories.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardBody>
+              <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
+              <p className="mb-3 text-xs text-brand-text/50">
+                Активные истории (живут 24 часа) — удалить может любой тренер
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {stories.map((s) => (
+                  <div key={s.id} className="rounded-xl border border-white/10 p-3">
+                    <div className="mb-2 aspect-[9/16] w-full overflow-hidden rounded-lg bg-black/40">
+                      {s.mediaType === "PHOTO" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/stories/${s.id}`}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={`/api/stories/${s.id}`}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                        />
+                      )}
+                    </div>
+                    {s.caption && <p className="text-sm text-brand-text/70">{s.caption}</p>}
+                    <p className="mt-1 text-xs text-brand-text/50">
+                      {formatDateRu(s.createdAt, "d MMMM, HH:mm")}
+                    </p>
+                    <form action={deleteStoryAction} className="mt-2">
+                      <input type="hidden" name="id" value={s.id} />
+                      <ConfirmSubmitButton confirmMessage="Удалить эту историю?">
+                        Удалить
+                      </ConfirmSubmitButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {trainer.role === "HEAD" && (
           <Card className="lg:col-span-2">

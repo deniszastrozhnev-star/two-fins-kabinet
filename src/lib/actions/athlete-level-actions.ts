@@ -75,25 +75,31 @@ export async function assignAthleteLevelAction(formData: FormData) {
   revalidateLevelsPath();
 }
 
-/** Текстовые задания по ОФП и гибкости для уровня — ровно одна запись на уровень. */
-export async function updateLevelTrainingAction(formData: FormData) {
+/** Текстовые задания по ОФП и гибкости на конкретный день для уровня — журнал:
+ * каждая дата отдельная запись, прошлые дни не перезаписываются. Повторное
+ * сохранение той же даты обновляет именно эту запись (upsert по level+date). */
+export async function saveLevelTrainingAction(formData: FormData) {
   await requireHeadTrainer();
   const levelRaw = String(formData.get("level") ?? "");
+  const dateStr = String(formData.get("date") ?? "");
   const ofpTask = String(formData.get("ofpTask") ?? "").trim();
   const flexibilityTask = String(formData.get("flexibilityTask") ?? "").trim();
 
   if (!ATHLETE_LEVEL_ORDER.includes(levelRaw as GroupLevel)) {
     throw new Error("Неизвестный уровень");
   }
+  if (!dateStr) throw new Error("Укажите дату");
   if (!ofpTask || !flexibilityTask) {
     throw new Error("Укажите задания по ОФП и по гибкости");
   }
 
   const level = levelRaw as GroupLevel;
+  const date = parseDateInputValue(dateStr);
   await prisma.levelTraining.upsert({
-    where: { level },
+    where: { level_date: { level, date } },
     update: { ofpTask, flexibilityTask },
-    create: { level, ofpTask, flexibilityTask },
+    create: { level, date, ofpTask, flexibilityTask },
   });
+  revalidatePath(`/trainer/athlete-levels/${level}`);
   revalidateLevelsPath();
 }

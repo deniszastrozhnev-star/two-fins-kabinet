@@ -11,7 +11,6 @@ const BASE_LINKS: NavLinkDef[] = [
   { href: "/trainer/schedule", label: "Расписание" },
   { href: "/trainer/personal-trainings", label: "Персональные тренировки" },
   { href: "/trainer/rank-standards", label: "Разряды" },
-  { href: "/trainer/stories", label: "Истории" },
   { href: "/trainer/athletes", label: "Спортсмены" },
   { href: "/trainer/events", label: "Новости и события" },
   { href: "/trainer/settings", label: "Настройки" },
