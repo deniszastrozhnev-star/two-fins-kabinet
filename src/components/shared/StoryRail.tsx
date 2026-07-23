@@ -14,12 +14,15 @@ export function StoryRail({
   ownName,
   ownAvatarUrl,
   canModerate = false,
+  canPost = false,
 }: {
   feed: StoriesFeed;
   ownName: string;
   ownAvatarUrl: string | null;
   /** Модерация — любой тренер может удалить чужую историю, не только автор. */
   canModerate?: boolean;
+  /** Публикация — теперь доступна только тренеру, остальные роли только смотрят. */
+  canPost?: boolean;
 }) {
   const [viewerStack, setViewerStack] = useState<null | {
     stories: StoryItem[];
@@ -32,35 +35,38 @@ export function StoryRail({
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-2 pt-1">
-        <div className="flex flex-shrink-0 flex-col items-center gap-1">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() =>
-                hasOwnStories
-                  ? setViewerStack({ stories: feed.own, canDelete: true })
-                  : setUploadOpen(true)
-              }
-              aria-label={hasOwnStories ? "Мои истории" : "Добавить историю"}
-            >
-              <Avatar
-                name={ownName}
-                url={ownAvatarUrl}
-                size={56}
-                ringClassName={hasOwnStories ? NEON_RING : NEUTRAL_RING}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              aria-label="Добавить историю"
-              className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-brand-base bg-brand-cyan text-xs font-bold text-white"
-            >
-              +
-            </button>
+        {(canPost || hasOwnStories) && (
+          <div className="flex flex-shrink-0 flex-col items-center gap-1">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (hasOwnStories) setViewerStack({ stories: feed.own, canDelete: true });
+                  else if (canPost) setUploadOpen(true);
+                }}
+                aria-label={hasOwnStories ? "Мои истории" : "Добавить историю"}
+              >
+                <Avatar
+                  name={ownName}
+                  url={ownAvatarUrl}
+                  size={56}
+                  ringClassName={hasOwnStories ? NEON_RING : NEUTRAL_RING}
+                />
+              </button>
+              {canPost && (
+                <button
+                  type="button"
+                  onClick={() => setUploadOpen(true)}
+                  aria-label="Добавить историю"
+                  className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-brand-base bg-brand-cyan text-xs font-bold text-white"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            <span className="max-w-[64px] truncate text-xs text-brand-text/60">Вы</span>
           </div>
-          <span className="max-w-[64px] truncate text-xs text-brand-text/60">Вы</span>
-        </div>
+        )}
 
         {feed.others.map(({ author, stories }) => (
           <div

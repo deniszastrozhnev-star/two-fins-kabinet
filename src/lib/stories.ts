@@ -21,6 +21,8 @@ export type StoryItem = {
   caption: string | null;
   createdAt: Date;
   author: StoryAuthor;
+  likeCount: number;
+  likedByViewer: boolean;
 };
 
 export type StoriesFeed = {
@@ -83,6 +85,22 @@ export async function getActiveStoriesFeed(viewer: {
   const athleteMap = new Map(athletes.map((a) => [a.id, a]));
   const childMap = new Map(children.map((c) => [c.id, c]));
 
+  const viewerRoleUpper = viewer.role.toUpperCase() as StoryAuthorRole;
+  const storyIds = rows.map((r) => r.id);
+  const [likeCounts, viewerLikes] = await Promise.all([
+    storyIds.length
+      ? prisma.storyLike.groupBy({ by: ["storyId"], where: { storyId: { in: storyIds } }, _count: true })
+      : Promise.resolve([]),
+    storyIds.length
+      ? prisma.storyLike.findMany({
+          where: { storyId: { in: storyIds }, likerRole: viewerRoleUpper, likerId: viewer.id },
+          select: { storyId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const likeCountMap = new Map(likeCounts.map((l) => [l.storyId, l._count]));
+  const viewerLikedSet = new Set(viewerLikes.map((l) => l.storyId));
+
   function resolveAuthor(role: StoryAuthorRole, id: string): StoryAuthor | null {
     if (role === "TRAINER") {
       const t = trainerMap.get(id);
@@ -111,7 +129,6 @@ export async function getActiveStoriesFeed(viewer: {
     return { role, id, name: `Родители ${c.lastName} ${c.firstName}`, avatarUrl: null };
   }
 
-  const viewerRoleUpper = viewer.role.toUpperCase() as StoryAuthorRole;
   const own: StoryItem[] = [];
   const othersMap = new Map<string, { author: StoryAuthor; stories: StoryItem[] }>();
 
@@ -126,6 +143,8 @@ export async function getActiveStoriesFeed(viewer: {
       caption: row.caption,
       createdAt: row.createdAt,
       author,
+      likeCount: likeCountMap.get(row.id) ?? 0,
+      likedByViewer: viewerLikedSet.has(row.id),
     };
 
     if (author.role === viewerRoleUpper && author.id === viewer.id) {

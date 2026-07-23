@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { deleteStoryAction } from "@/lib/actions/story-actions";
+import { deleteStoryAction, toggleStoryLikeAction } from "@/lib/actions/story-actions";
 import type { StoryItem } from "@/lib/stories";
 
 const PHOTO_DURATION_MS = 7000;
@@ -18,6 +18,9 @@ export function StoryViewer({
 }) {
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [likes, setLikes] = useState<Record<string, { count: number; liked: boolean }>>(() =>
+    Object.fromEntries(stories.map((s) => [s.id, { count: s.likeCount, liked: s.likedByViewer }])),
+  );
   const current = stories[index];
 
   function next() {
@@ -55,6 +58,14 @@ export function StoryViewer({
     await deleteStoryAction(fd);
     next();
   }
+
+  async function handleToggleLike() {
+    const storyId = current.id;
+    const { liked, likeCount } = await toggleStoryLikeAction(storyId);
+    setLikes((prev) => ({ ...prev, [storyId]: { liked, count: likeCount } }));
+  }
+
+  const currentLikes = likes[current.id] ?? { count: current.likeCount, liked: current.likedByViewer };
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
@@ -108,6 +119,22 @@ export function StoryViewer({
             playsInline
             onEnded={next}
           />
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-2 px-4 pb-2 pt-3">
+        <button
+          type="button"
+          onClick={handleToggleLike}
+          aria-label={currentLikes.liked ? "Убрать лайк" : "Поставить лайк"}
+          className={`text-2xl leading-none transition ${
+            currentLikes.liked ? "text-red-400" : "text-brand-text/60"
+          }`}
+        >
+          {currentLikes.liked ? "♥" : "♡"}
+        </button>
+        {currentLikes.count > 0 && (
+          <span className="text-sm text-brand-text/70">{currentLikes.count}</span>
         )}
       </div>
 

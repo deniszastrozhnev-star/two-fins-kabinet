@@ -88,7 +88,13 @@ export default async function TrainerDashboardPage() {
       <Card className="mb-8">
         <CardBody>
           <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
-          <StoryRail feed={storiesFeed} ownName={displayName} ownAvatarUrl={avatarUrl} canModerate />
+          <StoryRail
+            feed={storiesFeed}
+            ownName={displayName}
+            ownAvatarUrl={avatarUrl}
+            canModerate
+            canPost
+          />
         </CardBody>
       </Card>
 

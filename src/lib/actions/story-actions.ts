@@ -20,8 +20,8 @@ function revalidateStoryPaths() {
   revalidatePath("/parent");
 }
 
-/** Определяет автора истории по текущей сессии — публиковать может любая из трёх ролей. */
-function authorFromSession(
+/** Роль+id лайкающего/автора по текущей сессии — лайкать может любая из трёх ролей. */
+function actorFromSession(
   session: NonNullable<Awaited<ReturnType<typeof getSession>>>,
 ): { role: StoryAuthorRole; id: string } {
   if (session.role === "trainer") return { role: "TRAINER", id: session.trainerId };
@@ -34,8 +34,9 @@ export async function uploadStoryAction(
   formData: FormData,
 ): Promise<ActionState> {
   const session = await getSession();
-  if (!session) return { error: "Не авторизован" };
-  const { role: authorRole, id: authorId } = authorFromSession(session);
+  if (session?.role !== "trainer") return { error: "Публиковать истории может только тренер" };
+  const authorRole: StoryAuthorRole = "TRAINER";
+  const authorId = session.trainerId;
 
   const file = formData.get("media");
   const captionRaw = String(formData.get("caption") ?? "").trim();
@@ -109,4 +110,29 @@ export async function deleteStoryAction(formData: FormData) {
 
   await prisma.story.delete({ where: { id } });
   revalidateStoryPaths();
+}
+
+/** Переключает лайк текущего зрителя на истории — доступно любой из трёх ролей,
+ * включая автора. Возвращает актуальное состояние, чтобы клиент обновил счётчик
+ * без ожидания следующей ревалидации страницы. */
+export async function toggleStoryLikeAction(
+  storyId: string,
+): Promise<{ liked: boolean; likeCount: number }> {
+  const session = await getSession();
+  if (!session) throw new Error("Не авторизован");
+  const { role: likerRole, id: likerId } = actorFromSession(session);
+
+  const existing = await prisma.storyLike.findUnique({
+    where: { storyId_likerRole_likerId: { storyId, likerRole, likerId } },
+  });
+
+  if (existing) {
+    await prisma.storyLike.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.storyLike.create({ data: { storyId, likerRole, likerId } });
+  }
+
+  const likeCount = await prisma.storyLike.count({ where: { storyId } });
+  revalidateStoryPaths();
+  return { liked: !existing, likeCount };
 }
