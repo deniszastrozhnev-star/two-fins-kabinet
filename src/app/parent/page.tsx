@@ -4,6 +4,7 @@ import { getWorkoffBalance } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { getActiveStoriesFeed } from "@/lib/stories";
+import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { formatDateRu } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -26,7 +27,7 @@ export default async function ParentOverviewPage() {
       orderBy: { createdAt: "desc" },
     }),
     prisma.competitionResult.findMany({
-      where: { childId: child.id },
+      where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
       orderBy: { date: "desc" },
     }),
     getActiveStoriesFeed({ role: "parent", id: child.id }),
