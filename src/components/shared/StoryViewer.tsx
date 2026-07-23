@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteStoryAction } from "@/lib/actions/athlete-profile-actions";
-import type { StoryWithAuthor } from "@/lib/stories";
+import { deleteStoryAction } from "@/lib/actions/story-actions";
+import type { StoryItem } from "@/lib/stories";
 
 const PHOTO_DURATION_MS = 7000;
 
@@ -11,7 +11,7 @@ export function StoryViewer({
   onClose,
   canDelete,
 }: {
-  stories: StoryWithAuthor[];
+  stories: StoryItem[];
   onClose: () => void;
   canDelete: boolean;
 }) {
@@ -69,9 +69,7 @@ export function StoryViewer({
       </div>
 
       <div className="flex items-center justify-between px-3 py-2">
-        <p className="text-sm font-medium text-brand-text">
-          {current.athlete.lastName} {current.athlete.firstName}
-        </p>
+        <p className="text-sm font-medium text-brand-text">{current.author.name}</p>
         <div className="flex items-center gap-4">
           {canDelete && (
             <button type="button" onClick={handleDelete} className="text-sm text-red-300">

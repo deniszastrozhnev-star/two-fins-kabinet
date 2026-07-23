@@ -2,11 +2,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { formatDateRu } from "@/lib/dates";
+import { getActiveStoriesFeed } from "@/lib/stories";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TrainerAvatarUpload } from "@/components/trainer/TrainerAvatarUpload";
 import { TrainerProfileForm } from "@/components/trainer/TrainerProfileForm";
+import { StoryRail } from "@/components/shared/StoryRail";
 
 const QUICK_LINKS = [
   { href: "/trainer/attendance", label: "Посещаемость", desc: "Отметить занятие" },
@@ -25,7 +27,7 @@ export default async function TrainerDashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [childrenCount, groupsCount, overdueCount, upcomingEvents, myGroups] =
+  const [childrenCount, groupsCount, overdueCount, upcomingEvents, myGroups, storiesFeed] =
     await Promise.all([
       prisma.child.count(),
       prisma.group.count(),
@@ -41,8 +43,10 @@ export default async function TrainerDashboardPage() {
         where: { trainers: { some: { id: trainer.id } } },
         orderBy: { name: "asc" },
       }),
+      getActiveStoriesFeed({ role: "trainer", id: trainer.id }),
     ]);
   const avatarUrl = trainer.avatarUrl ? `/api/trainer-avatars/${trainer.id}` : null;
+  const displayName = trainer.displayName ?? trainer.username;
 
   return (
     <>
@@ -56,9 +60,9 @@ export default async function TrainerDashboardPage() {
           <CardBody>
             <h2 className="mb-4 font-heading text-lg font-bold">Мой профиль</h2>
             <div className="flex justify-center pb-4">
-              <TrainerAvatarUpload name={trainer.username} url={avatarUrl} size={96} />
+              <TrainerAvatarUpload name={displayName} url={avatarUrl} size={96} />
             </div>
-            <TrainerProfileForm bio={trainer.bio} rank={trainer.rank} />
+            <TrainerProfileForm displayName={trainer.displayName} bio={trainer.bio} rank={trainer.rank} />
           </CardBody>
         </Card>
         <Card>
@@ -80,6 +84,13 @@ export default async function TrainerDashboardPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Card className="mb-8">
+        <CardBody>
+          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
+          <StoryRail feed={storiesFeed} ownName={displayName} ownAvatarUrl={avatarUrl} canModerate />
+        </CardBody>
+      </Card>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <Card>

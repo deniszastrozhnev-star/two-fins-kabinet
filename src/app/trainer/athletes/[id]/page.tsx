@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { getAthleteCompetitionHistory } from "@/lib/athleteCompetitions";
 import { deleteAthleteAction } from "@/lib/actions/athlete-delete-actions";
-import { deleteStoryAction } from "@/lib/actions/athlete-profile-actions";
+import { deleteStoryAction } from "@/lib/actions/story-actions";
 import { ACTIVE_STORY_HOURS } from "@/lib/stories";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -42,8 +42,12 @@ export default async function TrainerAthleteDetailPage({
         orderBy: { date: "desc" },
         take: 50,
       }),
-      prisma.athleteStory.findMany({
-        where: { athleteId: id, createdAt: { gte: subHours(new Date(), ACTIVE_STORY_HOURS) } },
+      prisma.story.findMany({
+        where: {
+          authorRole: "ATHLETE",
+          authorId: id,
+          createdAt: { gte: subHours(new Date(), ACTIVE_STORY_HOURS) },
+        },
         orderBy: { createdAt: "desc" },
       }),
     ]);

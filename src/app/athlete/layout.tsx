@@ -26,7 +26,7 @@ export default async function AthleteLayout({
 
   const [suggestedRank, storiesFeed] = await Promise.all([
     getSuggestedRankForAthlete(athlete.id, gender),
-    getActiveStoriesFeed(athlete.id),
+    getActiveStoriesFeed({ role: "athlete", id: athlete.id }),
   ]);
 
   const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);

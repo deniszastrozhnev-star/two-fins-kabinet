@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/shared/Avatar";
 import { StoryViewer } from "./StoryViewer";
 import { StoryUploadModal } from "./StoryUploadModal";
-import type { StoriesFeed, StoryWithAuthor } from "@/lib/stories";
+import type { StoriesFeed, StoryItem } from "@/lib/stories";
 
 const NEON_RING = "bg-gradient-to-tr from-brand-blue via-brand-cyan to-brand-violet";
 const NEUTRAL_RING = "bg-white/15";
@@ -13,13 +13,16 @@ export function StoryRail({
   feed,
   ownName,
   ownAvatarUrl,
+  canModerate = false,
 }: {
   feed: StoriesFeed;
   ownName: string;
   ownAvatarUrl: string | null;
+  /** Модерация — любой тренер может удалить чужую историю, не только автор. */
+  canModerate?: boolean;
 }) {
   const [viewerStack, setViewerStack] = useState<null | {
-    stories: StoryWithAuthor[];
+    stories: StoryItem[];
     canDelete: boolean;
   }>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -59,23 +62,19 @@ export function StoryRail({
           <span className="max-w-[64px] truncate text-xs text-brand-text/60">Вы</span>
         </div>
 
-        {feed.others.map(({ athlete, stories }) => (
-          <div key={athlete.id} className="flex flex-shrink-0 flex-col items-center gap-1">
+        {feed.others.map(({ author, stories }) => (
+          <div
+            key={`${author.role}:${author.id}`}
+            className="flex flex-shrink-0 flex-col items-center gap-1"
+          >
             <button
               type="button"
-              onClick={() => setViewerStack({ stories, canDelete: false })}
-              aria-label={`Истории: ${athlete.lastName} ${athlete.firstName}`}
+              onClick={() => setViewerStack({ stories, canDelete: canModerate })}
+              aria-label={`Истории: ${author.name}`}
             >
-              <Avatar
-                name={`${athlete.lastName} ${athlete.firstName}`}
-                url={athlete.avatarUrl}
-                size={56}
-                ringClassName={NEON_RING}
-              />
+              <Avatar name={author.name} url={author.avatarUrl} size={56} ringClassName={NEON_RING} />
             </button>
-            <span className="max-w-[64px] truncate text-xs text-brand-text/60">
-              {athlete.firstName}
-            </span>
+            <span className="max-w-[64px] truncate text-xs text-brand-text/60">{author.name}</span>
           </div>
         ))}
       </div>

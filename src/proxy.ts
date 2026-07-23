@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   SESSION_COOKIE_NAME,
+  getSessionAgeSeconds,
   sessionCookieOptions,
   signSession,
   verifySession,
 } from "@/lib/session";
+
+// Перевыпускаем cookie не чаще раза в неделю вместо безусловно на каждом
+// запросе — 90-дневное скользящее окно для активных пользователей по факту
+// не меняется, просто перестаём слать лишний Set-Cookie на каждый клик.
+const REFRESH_THRESHOLD_SECONDS = 60 * 60 * 24 * 7;
 
 // Помимо основного продакшен-алиаса Vercel-проект отдаёт ещё несколько
 // доменов (team-alias, git-branch alias, per-deploy URL) — у них СВОЙ
@@ -62,17 +68,21 @@ export async function proxy(request: NextRequest) {
 
   const response = NextResponse.next();
 
-  // Скользящее продление: при каждом заходе перевыпускаем токен с новым
-  // сроком действия, поэтому активный пользователь не разлогинится, пока
-  // сам не нажмёт «Выйти» — фиксированный 90-дневный срок начинает
-  // отсчитываться заново с последнего визита.
+  // Скользящее продление: перевыпускаем токен с новым сроком действия, поэтому
+  // активный пользователь не разлогинится, пока сам не нажмёт «Выйти» —
+  // фиксированный 90-дневный срок начинает отсчитываться заново с последнего
+  // визита. Не на каждом запросе — только когда токену больше недели, иначе
+  // каждый клик тратит время на подпись и добавляет лишний Set-Cookie в ответ.
   if (session) {
-    const refreshed = await signSession(session);
-    response.cookies.set(
-      SESSION_COOKIE_NAME,
-      refreshed,
-      sessionCookieOptions(session.role),
-    );
+    const age = getSessionAgeSeconds(token);
+    if (age === null || age > REFRESH_THRESHOLD_SECONDS) {
+      const refreshed = await signSession(session);
+      response.cookies.set(
+        SESSION_COOKIE_NAME,
+        refreshed,
+        sessionCookieOptions(session.role),
+      );
+    }
   }
 
   return response;

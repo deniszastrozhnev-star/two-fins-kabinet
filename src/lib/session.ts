@@ -66,4 +66,19 @@ export async function verifySession(
   }
 }
 
+/** Возраст токена в секундах — без повторной crypto-проверки (используется в
+ * src/proxy.ts сразу после verifySession в том же запросе, токен уже доверенный).
+ * Нужен, чтобы не перевыпускать и не перезаписывать cookie на каждом запросе —
+ * только когда скользящее окно правда пора продлить. */
+export function getSessionAgeSeconds(token: string | undefined): number | null {
+  if (!token) return null;
+  try {
+    const payloadB64 = token.split(".")[1];
+    const json = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    return typeof json.iat === "number" ? Math.floor(Date.now() / 1000) - json.iat : null;
+  } catch {
+    return null;
+  }
+}
+
 export const SESSION_COOKIE_NAME = COOKIE_NAME;

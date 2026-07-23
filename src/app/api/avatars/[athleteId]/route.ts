@@ -3,14 +3,15 @@ import { get } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-/** Отдаёт аватар спортсмена (приватный blob) — доступно любому вошедшему
- * тренеру или спортсмену (не чувствительный документ, просто фото профиля). */
+/** Отдаёт аватар спортсмена (приватный blob) — доступно любой вошедшей роли
+ * (тренер/спортсмен/родитель): не чувствительный документ, просто фото профиля,
+ * и теперь нужен родителю в общей ленте историй (истории спортсменов видны родителям). */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ athleteId: string }> },
 ) {
   const session = await getSession();
-  if (!session || (session.role !== "trainer" && session.role !== "athlete")) {
+  if (!session) {
     return new NextResponse("Не авторизован", { status: 401 });
   }
 

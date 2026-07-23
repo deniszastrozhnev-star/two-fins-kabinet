@@ -3,6 +3,7 @@ import { requireParentChild } from "@/lib/auth";
 import { getWorkoffBalance } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
+import { getActiveStoriesFeed } from "@/lib/stories";
 import { formatDateRu } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -10,13 +11,14 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
+import { StoryRail } from "@/components/shared/StoryRail";
 
 const SBP_LINK =
   "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
 export default async function ParentOverviewPage() {
   const child = await requireParentChild();
-  const [balance, payment, latestCertificate, results] = await Promise.all([
+  const [balance, payment, latestCertificate, results, storiesFeed] = await Promise.all([
     getWorkoffBalance(child.id),
     Promise.resolve(getPaymentStatus(child.paidUntil)),
     prisma.medicalCertificate.findFirst({
@@ -27,6 +29,7 @@ export default async function ParentOverviewPage() {
       where: { childId: child.id },
       orderBy: { date: "desc" },
     }),
+    getActiveStoriesFeed({ role: "parent", id: child.id }),
   ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
 
@@ -40,6 +43,17 @@ export default async function ParentOverviewPage() {
             : "Группа пока не назначена"
         }
       />
+
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
+          <StoryRail
+            feed={storiesFeed}
+            ownName={`Родители ${child.lastName} ${child.firstName}`}
+            ownAvatarUrl={null}
+          />
+        </CardBody>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

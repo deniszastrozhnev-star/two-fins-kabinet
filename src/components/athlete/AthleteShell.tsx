@@ -5,7 +5,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { AvatarUpload } from "@/components/athlete/AvatarUpload";
 import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
 import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
-import { StoryRail } from "@/components/athlete/StoryRail";
+import { StoryRail } from "@/components/shared/StoryRail";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 import type { AthleteRank, Gender } from "@prisma/client";
 import type { StoriesFeed } from "@/lib/stories";

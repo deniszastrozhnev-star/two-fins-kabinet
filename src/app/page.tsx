@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Card, CardBody } from "@/components/ui/Card";
+import { InstallInstructions } from "@/components/InstallInstructions";
 
 export default async function HomePage() {
   // PWA открывается со значка "На домой" всегда с этого адреса (start_url в
@@ -88,6 +89,10 @@ export default async function HomePage() {
             </Card>
           </Link>
         </div>
+      </div>
+
+      <div className="mt-4 w-full max-w-xl">
+        <InstallInstructions />
       </div>
     </main>
   );

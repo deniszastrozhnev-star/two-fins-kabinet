@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useEffect } from "react";
-import { uploadStoryAction } from "@/lib/actions/athlete-profile-actions";
+import { uploadStoryAction } from "@/lib/actions/story-actions";
 import { FieldGroup, Input } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
 

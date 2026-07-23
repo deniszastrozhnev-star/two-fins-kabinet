@@ -21,12 +21,13 @@ export default async function ParentTrainersPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         {trainers.map((t) => {
           const avatarUrl = t.avatarUrl ? `/api/trainer-avatars/${t.id}` : null;
+          const name = t.displayName ?? t.username;
           return (
             <Card key={t.id}>
               <CardBody className="flex flex-col items-center gap-3 text-center">
-                <Avatar name={t.username} url={avatarUrl} size={88} />
+                <Avatar name={name} url={avatarUrl} size={88} />
                 <div>
-                  <p className="font-heading text-lg font-bold">{t.username}</p>
+                  <p className="font-heading text-lg font-bold">{name}</p>
                   <Badge tone={t.role === "HEAD" ? "violet" : "neutral"} className="mt-1">
                     {TRAINER_ROLE_LABELS[t.role]}
                   </Badge>

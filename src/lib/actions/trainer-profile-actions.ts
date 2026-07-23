@@ -13,6 +13,7 @@ export type ActionState = { error?: string; success?: string } | undefined;
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const MAX_BIO_LENGTH = 1000;
+const MAX_DISPLAY_NAME_LENGTH = 100;
 
 function revalidateProfilePaths() {
   revalidatePath("/trainer");
@@ -53,6 +54,12 @@ export async function updateTrainerProfileAction(
 ): Promise<ActionState> {
   const trainer = await requireTrainer();
 
+  const displayNameRaw = String(formData.get("displayName") ?? "").trim();
+  if (displayNameRaw.length > MAX_DISPLAY_NAME_LENGTH) {
+    return { error: `ФИО слишком длинное (максимум ${MAX_DISPLAY_NAME_LENGTH} символов)` };
+  }
+  const displayName = displayNameRaw || null;
+
   const bioRaw = String(formData.get("bio") ?? "").trim();
   if (bioRaw.length > MAX_BIO_LENGTH) {
     return { error: `«О себе» слишком длинное (максимум ${MAX_BIO_LENGTH} символов)` };
@@ -64,7 +71,7 @@ export async function updateTrainerProfileAction(
     ? (rankRaw as AthleteRank)
     : null;
 
-  await prisma.trainer.update({ where: { id: trainer.id }, data: { bio, rank } });
+  await prisma.trainer.update({ where: { id: trainer.id }, data: { displayName, bio, rank } });
   revalidateProfilePaths();
   return { success: "Профиль обновлён" };
 }

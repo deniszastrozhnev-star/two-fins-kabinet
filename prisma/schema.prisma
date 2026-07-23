@@ -16,6 +16,7 @@ model Trainer {
   username     String       @unique
   passwordHash String
   role         TrainerRole  @default(TRAINER)
+  displayName  String? // ФИО для отображения родителям — отдельно от логина (username)
   avatarUrl    String?
   bio          String?
   rank         AthleteRank? // личный разряд тренера по плаванию — тот же enum, что у спортсменов
@@ -249,7 +250,6 @@ model Athlete {
   flexibilityWorkouts FlexibilityWorkout[]
   competitionResults  AthleteCompetitionResult[]
   levelTrainingLogs   LevelTrainingLog[]
-  stories             AthleteStory[]
 
   @@index([lastName, firstName])
 }
@@ -259,20 +259,29 @@ enum StoryMediaType {
   VIDEO
 }
 
+enum StoryAuthorRole {
+  TRAINER
+  ATHLETE
+  PARENT
+}
+
 // "Истории" — фото/видео (одно на историю) + опциональная подпись, живут 24 часа
 // (фильтр по createdAt при чтении, без отдельного expiresAt и без фоновой очистки —
 // простой просмотр, без лайков/просмотров/комментариев). Удалить может автор или
-// любой тренер (модерация).
-model AthleteStory {
-  id        String         @id @default(cuid())
-  athleteId String
-  athlete   Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  mediaUrl  String
-  mediaType StoryMediaType
-  caption   String?
-  createdAt DateTime       @default(now())
+// любой тренер (модерация). Единая модель для всех трёх ролей — authorId без FK,
+// т.к. указывает то на Trainer.id, то на Athlete.id, то на Child.id (родитель
+// привязан через ребёнка, как и остальные родительские данные в проекте — отдельной
+// модели Parent нет). Видимость по ролям считается в src/lib/stories.ts, не в схеме.
+model Story {
+  id         String          @id @default(cuid())
+  authorRole StoryAuthorRole
+  authorId   String
+  mediaUrl   String
+  mediaType  StoryMediaType
+  caption    String?
+  createdAt  DateTime        @default(now())
 
-  @@index([athleteId])
+  @@index([authorRole, authorId])
   @@index([createdAt])
 }
 
