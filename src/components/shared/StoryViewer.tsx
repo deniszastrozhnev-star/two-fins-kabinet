@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { deleteStoryAction } from "@/lib/actions/story-actions";
 import type { StoryItem } from "@/lib/stories";
 
@@ -55,7 +56,7 @@ export function StoryViewer({
     next();
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
       <div className="flex gap-1 px-3 pt-3">
         {stories.map((s, i) => (
@@ -113,6 +114,7 @@ export function StoryViewer({
       {current.caption && (
         <p className="px-4 pb-6 text-center text-sm text-brand-text/90">{current.caption}</p>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

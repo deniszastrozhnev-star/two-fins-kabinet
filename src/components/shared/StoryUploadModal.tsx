@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { uploadStoryAction } from "@/lib/actions/story-actions";
 import { FieldGroup, Input } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
@@ -16,7 +17,7 @@ export function StoryUploadModal({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
       onClick={onClose}
@@ -61,6 +62,7 @@ export function StoryUploadModal({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
