@@ -86,6 +86,9 @@ model Child {
 
   @@index([groupId])
   @@index([parentPhone])
+  // Логин спортсмена ищет Child по фамилии+имени (ILIKE, не использует btree)
+  // + дате рождения (точное совпадение) — birthDate сужает выборку до ILIKE-фильтра.
+  @@index([birthDate])
 }
 
 // Право ребёнка на доп. занятия в неделю в ЧУЖОЙ группе (помимо основной groupId) —
@@ -143,6 +146,9 @@ model AttendanceRecord {
   @@index([childId])
   @@index([groupId, date])
   @@index([markedByTrainerId, date])
+  // Отчёт по зарплате считает по всем тренерам сразу за период (без фильтра
+  // по markedByTrainerId/groupId) — без отдельного индекса это скан всей таблицы.
+  @@index([date])
   @@unique([childId, groupId, date])
 }
 
@@ -165,6 +171,9 @@ model PersonalTraining {
   createdAt  DateTime   @default(now())
 
   @@index([trainerId, date])
+  // Отчёт по зарплате считает по всем тренерам сразу за период — тот же
+  // повод, что и у AttendanceRecord.date выше.
+  @@index([date])
 }
 
 model PaymentReceipt {
@@ -252,6 +261,9 @@ model Athlete {
   levelTrainingLogs   LevelTrainingLog[]
 
   @@index([lastName, firstName])
+  // Логин ищет по фамилии+имени (ILIKE, не использует btree) + дате рождения
+  // (точное совпадение) — birthDate сужает выборку до ILIKE-фильтра.
+  @@index([birthDate])
 }
 
 enum StoryMediaType {
@@ -351,6 +363,9 @@ model PoolWorkout {
   createdAt    DateTime @default(now())
 
   @@index([athleteId])
+  // Рейтинг спортсменов (getAthleteLeaderboard) агрегирует по всем
+  // спортсменам сразу за период — без фильтра по athleteId, только по date.
+  @@index([date])
 }
 
 model GymWorkout {
@@ -363,6 +378,7 @@ model GymWorkout {
   createdAt       DateTime @default(now())
 
   @@index([athleteId])
+  @@index([date])
 }
 
 model FlexibilityWorkout {
@@ -375,6 +391,7 @@ model FlexibilityWorkout {
   createdAt       DateTime @default(now())
 
   @@index([athleteId])
+  @@index([date])
 }
 
 // Дисциплины плавания в ластах по классификации ЕВСК.
