@@ -46,39 +46,53 @@ export default async function ChildDetailPage({
 
   await markLatestReceiptViewed(id);
 
-  const [groups, balance, history, receipts, certificates, results, tariffs, extraSessions] =
-    await Promise.all([
-      prisma.group.findMany({
-        orderBy: [{ level: "asc" }, { name: "asc" }],
-        select: { id: true, name: true },
-      }),
-      getWorkoffBalance(id),
-      prisma.attendanceRecord.findMany({
-        where: { childId: id },
-        orderBy: { date: "desc" },
-        take: 20,
-        include: { group: true },
-      }),
-      prisma.paymentReceipt.findMany({
-        where: { childId: id },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-      prisma.medicalCertificate.findMany({
-        where: { childId: id },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-      prisma.competitionResult.findMany({
-        where: { childId: id },
-        orderBy: { date: "desc" },
-      }),
-      getKnownTariffs(),
-      prisma.extraSessionEntitlement.findMany({
-        where: { childId: id },
-        include: { group: true },
-      }),
-    ]);
+  const [
+    groups,
+    balance,
+    history,
+    receipts,
+    certificates,
+    contracts,
+    results,
+    tariffs,
+    extraSessions,
+  ] = await Promise.all([
+    prisma.group.findMany({
+      orderBy: [{ level: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
+    }),
+    getWorkoffBalance(id),
+    prisma.attendanceRecord.findMany({
+      where: { childId: id },
+      orderBy: { date: "desc" },
+      take: 20,
+      include: { group: true },
+    }),
+    prisma.paymentReceipt.findMany({
+      where: { childId: id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.medicalCertificate.findMany({
+      where: { childId: id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.contractDocument.findMany({
+      where: { childId: id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.competitionResult.findMany({
+      where: { childId: id },
+      orderBy: { date: "desc" },
+    }),
+    getKnownTariffs(),
+    prisma.extraSessionEntitlement.findMany({
+      where: { childId: id },
+      include: { group: true },
+    }),
+  ]);
 
   const payment = getPaymentStatus(child.paidUntil);
   const medicalStatus = getMedicalStatus(certificates[0]?.validUntil ?? null);
@@ -328,6 +342,62 @@ export default async function ChildDetailPage({
                         </span>
                         <a
                           href={`/api/medical/${cert.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-brand-cyan hover:underline"
+                        >
+                          {isImage ? "Открыть →" : "Открыть PDF →"}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-heading text-lg font-bold">Договор</h2>
+                <Badge tone={contracts.length > 0 ? "green" : "amber"}>
+                  {contracts.length > 0 ? "Договор загружен" : "Договор не загружен"}
+                </Badge>
+              </div>
+              {contracts.length === 0 ? (
+                <p className="text-sm text-brand-text/50">
+                  Договор ещё не загружен родителем.
+                </p>
+              ) : (
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {contracts.map((doc) => {
+                    const isImage = doc.contentType?.startsWith("image/");
+                    return (
+                      <li key={doc.id} className="flex items-center gap-3 py-2">
+                        <a
+                          href={`/api/contracts/${doc.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0"
+                        >
+                          {isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`/api/contracts/${doc.id}`}
+                              alt="Превью договора"
+                              className="h-12 w-12 rounded-lg border border-white/10 object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-brand-text/60">
+                              PDF
+                            </span>
+                          )}
+                        </a>
+                        <span className="flex-1 text-sm text-brand-text/70">
+                          Загружен {formatDateRu(doc.createdAt)}
+                        </span>
+                        <a
+                          href={`/api/contracts/${doc.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-brand-cyan hover:underline"

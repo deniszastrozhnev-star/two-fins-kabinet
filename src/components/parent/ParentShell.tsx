@@ -15,9 +15,11 @@ const LINKS = [
 export function ParentShell({
   children,
   childName,
+  contractUploaded,
 }: {
   children: React.ReactNode;
   childName: string;
+  contractUploaded: boolean;
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -50,6 +52,15 @@ export function ParentShell({
           ))}
         </nav>
       </header>
+
+      {!contractUploaded && (
+        <a
+          href="/parent#contract"
+          className="block border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200 transition hover:bg-amber-500/15 sm:px-6"
+        >
+          Пожалуйста, распечатайте, подпишите и загрузите договор →
+        </a>
+      )}
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
         {children}

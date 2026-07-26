@@ -79,6 +79,7 @@ model Child {
   personalTrainings        PersonalTraining[]
   paymentReceipts          PaymentReceipt[]
   medicalCertificates      MedicalCertificate[]
+  contractDocuments        ContractDocument[]
   competitionResults       CompetitionResult[]
   waitlistEntries          GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
@@ -197,6 +198,21 @@ model MedicalCertificate {
   fileUrl     String
   contentType String?
   validUntil  DateTime @db.Date
+  createdAt   DateTime @default(now())
+
+  @@index([childId])
+}
+
+// Скан/фото подписанного родителем абонентского договора — родитель скачивает
+// бланк (статический файл в public/), печатает, подписывает и загружает сюда
+// то же самое, что с чеками/справками. Несколько записей на случай переподписания
+// (например, новый год) — тренер всегда видит последнюю.
+model ContractDocument {
+  id          String   @id @default(cuid())
+  childId     String
+  child       Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  contentType String?
   createdAt   DateTime @default(now())
 
   @@index([childId])

@@ -12,6 +12,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
+import { ContractUpload } from "@/components/parent/ContractUpload";
 import { StoryRail } from "@/components/shared/StoryRail";
 
 const SBP_LINK =
@@ -19,19 +20,24 @@ const SBP_LINK =
 
 export default async function ParentOverviewPage() {
   const child = await requireParentChild();
-  const [balance, payment, latestCertificate, results, storiesFeed] = await Promise.all([
-    getWorkoffBalance(child.id),
-    Promise.resolve(getPaymentStatus(child.paidUntil)),
-    prisma.medicalCertificate.findFirst({
-      where: { childId: child.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.competitionResult.findMany({
-      where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
-      orderBy: { date: "desc" },
-    }),
-    getActiveStoriesFeed({ role: "parent", id: child.id }),
-  ]);
+  const [balance, payment, latestCertificate, latestContract, results, storiesFeed] =
+    await Promise.all([
+      getWorkoffBalance(child.id),
+      Promise.resolve(getPaymentStatus(child.paidUntil)),
+      prisma.medicalCertificate.findFirst({
+        where: { childId: child.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.contractDocument.findFirst({
+        where: { childId: child.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.competitionResult.findMany({
+        where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
+        orderBy: { date: "desc" },
+      }),
+      getActiveStoriesFeed({ role: "parent", id: child.id }),
+    ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
 
   return (
@@ -117,7 +123,7 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        <Card className="sm:col-span-2">
+        <Card className="scroll-mt-24 sm:col-span-2" id="contract">
           <CardBody>
             <p className="text-sm text-brand-text/60">Медицинские документы</p>
             <div className="mt-2">
@@ -137,6 +143,32 @@ export default async function ParentOverviewPage() {
             </div>
             <div className="mt-4 max-w-sm border-t border-white/10 pt-4">
               <MedicalCertificateUpload />
+            </div>
+
+            <div className="mt-6 max-w-sm border-t border-white/10 pt-4">
+              <p className="text-sm text-brand-text/60">Договор</p>
+              <p className="mt-2 text-sm text-brand-text/70">
+                Распечатайте договор в 2 экземплярах, подпишите оба. Один экземпляр
+                оставьте себе, второй (сфотографированный или отсканированный)
+                загрузите здесь.
+              </p>
+              <a
+                href="/api/contract-template"
+                download
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-brand-text transition hover:bg-white/15"
+              >
+                Скачать договор
+              </a>
+              <div className="mt-4">
+                {latestContract ? (
+                  <Badge tone="green">Договор загружен</Badge>
+                ) : (
+                  <Badge tone="amber">Договор не загружен</Badge>
+                )}
+              </div>
+              <div className="mt-4">
+                <ContractUpload />
+              </div>
             </div>
           </CardBody>
         </Card>
