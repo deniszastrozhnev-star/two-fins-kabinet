@@ -12,22 +12,20 @@ export default async function AthleteLayout({
 }) {
   const athlete = await requireAthlete();
 
-  const [athleteExtra, weekBoard] = await Promise.all([
+  const [athleteExtra, weekBoard, storiesFeed] = await Promise.all([
     prisma.athlete.findUnique({
       where: { id: athlete.id },
       select: { rank: true, gender: true, avatarUrl: true },
     }),
     getAthleteLeaderboard("week"),
+    getActiveStoriesFeed({ role: "athlete", id: athlete.id }),
   ]);
 
   const rank = athleteExtra?.rank ?? null;
   const gender = athleteExtra?.gender ?? null;
   const avatarUrl = athleteExtra?.avatarUrl ? `/api/avatars/${athlete.id}` : null;
 
-  const [suggestedRank, storiesFeed] = await Promise.all([
-    getSuggestedRankForAthlete(athlete.id, gender),
-    getActiveStoriesFeed({ role: "athlete", id: athlete.id }),
-  ]);
+  const suggestedRank = await getSuggestedRankForAthlete(athlete.id, gender);
 
   const weekIndex = weekBoard.findIndex((r) => r.athleteId === athlete.id);
   const weekRow = weekIndex >= 0 ? weekBoard[weekIndex] : null;

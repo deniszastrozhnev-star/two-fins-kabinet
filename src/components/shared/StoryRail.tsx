@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Avatar } from "@/components/shared/Avatar";
-import { StoryViewer } from "./StoryViewer";
-import { StoryUploadModal } from "./StoryUploadModal";
 import type { StoriesFeed, StoryItem } from "@/lib/stories";
+
+// Ленивая загрузка — StoryRail рендерится на КАЖДОЙ странице раздела (лежит в
+// общем layout/shell), а сам просмотрщик/загрузчик истории нужен только когда
+// пользователь реально открывает историю. Без dynamic() их код (и код
+// StoryUploadModal с формой файла) уезжал бы в основной чанк каждой страницы
+// /athlete, /parent, /trainer — даже если пользователь ни разу не открыл ленту.
+const StoryViewer = dynamic(() => import("./StoryViewer").then((m) => m.StoryViewer));
+const StoryUploadModal = dynamic(() => import("./StoryUploadModal").then((m) => m.StoryUploadModal));
 
 const NEON_RING = "bg-gradient-to-tr from-brand-blue via-brand-cyan to-brand-violet";
 const NEUTRAL_RING = "bg-white/15";

@@ -13,19 +13,19 @@ import { formatDateRu } from "@/lib/dates";
 
 export default async function AthleteCompetitionsPage() {
   const athlete = await requireAthlete();
-  const athleteExtra = await prisma.athlete.findUnique({
-    where: { id: athlete.id },
-    select: { linkedChildId: true },
-  });
-  const [results, courseResults] = await Promise.all([
+  const [athleteExtra, results] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: { linkedChildId: true },
+    }),
     getAthleteCompetitionHistory(athlete.id),
-    athleteExtra?.linkedChildId
-      ? prisma.competitionResult.findMany({
-          where: { childId: athleteExtra.linkedChildId, competitionName: COURSE_RESULT_NAME },
-          orderBy: { date: "desc" },
-        })
-      : Promise.resolve([]),
   ]);
+  const courseResults = athleteExtra?.linkedChildId
+    ? await prisma.competitionResult.findMany({
+        where: { childId: athleteExtra.linkedChildId, competitionName: COURSE_RESULT_NAME },
+        orderBy: { date: "desc" },
+      })
+    : [];
 
   return (
     <>

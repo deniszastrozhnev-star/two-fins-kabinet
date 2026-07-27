@@ -1,12 +1,19 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getAthleteCompetitionHistory } from "@/lib/athleteCompetitions";
 import { ATHLETE_RANK_ORDER } from "@/lib/labels";
 import type { AthleteRank, FinDiscipline, Gender, RankStandard, TimingType } from "@prisma/client";
 
-export async function getRankStandardsTable(): Promise<RankStandard[]> {
-  return prisma.rankStandard.findMany();
-}
+/** Таблица нормативов ЕВСК — справочные данные, заполняются один раз seed-скриптом
+ * и не редактируются через UI (см. prisma/seedRankStandards.mjs). Кэш на 6 часов —
+ * читается на каждый заход на /trainer|/parent|/athlete/rank-standards и при
+ * подсказке разряда (getSuggestedRankForAthlete), а меняется практически никогда. */
+export const getRankStandardsTable = unstable_cache(
+  async (): Promise<RankStandard[]> => prisma.rankStandard.findMany(),
+  ["rank-standards-table"],
+  { revalidate: 21600, tags: ["rank-standards"] },
+);
 
 /** Среди нормативов данной дисциплины+хронометража+пола находит самый высокий
  * разряд, чьё время спортсмен уже превзошёл (resultCentis <= норматив). */

@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function ParentWorkoffSchedulePage() {
   const child = await requireParentChild();
-  const balance = await getWorkoffBalance(child.id);
 
   if (!child.group) {
     return (
@@ -22,10 +21,13 @@ export default async function ParentWorkoffSchedulePage() {
     );
   }
 
-  const groups = await prisma.group.findMany({
-    where: { level: child.group.level },
-    orderBy: { name: "asc" },
-  });
+  const [balance, groups] = await Promise.all([
+    getWorkoffBalance(child.id),
+    prisma.group.findMany({
+      where: { level: child.group.level },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <>

@@ -64,10 +64,13 @@ export default async function AthleteTrainingsPage({
   const period: AthletePeriod = params.period === "month" ? "month" : "week";
   const reference = params.ref ? parseDateInputValue(params.ref) : new Date();
 
-  const athleteExtra = await prisma.athlete.findUnique({
-    where: { id: athlete.id },
-    select: { level: true },
-  });
+  const [athleteExtra, history] = await Promise.all([
+    prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: { level: true },
+    }),
+    getTrainingLogHistory(athlete.id, period, reference),
+  ]);
   const level = athleteExtra?.level ?? null;
 
   const taskDates = level ? await getLevelTrainingDates(level) : [];
@@ -76,8 +79,6 @@ export default async function AthleteTrainingsPage({
     level && taskDates.length > 0
       ? await getLevelTrainingForDate(level, parseDateInputValue(selectedTaskDateStr))
       : null;
-
-  const history = await getTrainingLogHistory(athlete.id, period, reference);
 
   const prevRef = toDateInputValue(
     period === "week" ? subWeeks(reference, 1) : subMonths(reference, 1),

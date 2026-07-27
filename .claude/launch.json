@@ -6,6 +6,12 @@
       "runtimeExecutable": "C:\\Users\\Two Fins\\Desktop\\TwoFinsKabinet\\.claude\\dev-with-node.cmd",
       "runtimeArgs": [],
       "port": 3000
+    },
+    {
+      "name": "prod",
+      "runtimeExecutable": "C:\\Users\\Two Fins\\Desktop\\TwoFinsKabinet\\.claude\\prod-with-node.cmd",
+      "runtimeArgs": [],
+      "port": 3001
     }
   ]
 }
