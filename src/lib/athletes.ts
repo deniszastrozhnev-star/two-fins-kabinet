@@ -1,5 +1,5 @@
 import "server-only";
-import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   startOfWeek,
   endOfWeek,
@@ -22,7 +22,8 @@ export type AthleteRankRow = {
   flexibilityMinutes: number;
   rawPoints: number;
   missedDays: number;
-  missedDates: Date[];
+  /** YYYY-MM-DD — не Date: результат проходит через кэш next/cache (сериализация в JSON). */
+  missedDates: string[];
   points: number;
 };
 
@@ -49,11 +50,16 @@ export function computeAthletePoints(volumeMeters: number, gymMinutes: number): 
  * саму формулу очков не входит — только в определение "был ли активен в
  * этот день". Штраф не начисляется за дни до регистрации спортсмена и за
  * ещё не наступившие дни периода.
+ *
+ * Кэшируется на 5 минут (across requests, не только в рамках одного рендера) —
+ * рейтинг не обязан быть посекундно точным, а без кэша это самый частый и самый
+ * тяжёлый запрос в проекте (грузится на /athlete, /athlete/rating, /trainer/athletes).
  */
-export const getAthleteLeaderboard = cache(async function getAthleteLeaderboard(
+async function computeAthleteLeaderboard(
   period: AthletePeriod,
-  reference = new Date(),
+  referenceDateStr: string,
 ): Promise<AthleteRankRow[]> {
+  const reference = parseDateInputValue(referenceDateStr);
   const { start, end } = getPeriodRange(period, reference);
   const today = parseDateInputValue(toDateInputValue(reference));
   const penaltyEnd = end < today ? end : today;
@@ -119,12 +125,13 @@ export const getAthleteLeaderboard = cache(async function getAthleteLeaderboard(
     const rawPoints = computeAthletePoints(poolVolumeMeters, gymMinutes);
 
     const eligibleStart = a.createdAt > start ? a.createdAt : start;
-    const missedDates: Date[] = [];
+    const missedDates: string[] = [];
     if (penaltyEnd >= eligibleStart) {
       const activeDays = activeDaysByAthlete.get(a.id) ?? new Set<string>();
       for (const day of eachDayOfInterval({ start: eligibleStart, end: penaltyEnd })) {
-        if (!activeDays.has(format(day, "yyyy-MM-dd"))) {
-          missedDates.push(day);
+        const key = format(day, "yyyy-MM-dd");
+        if (!activeDays.has(key)) {
+          missedDates.push(key);
         }
       }
     }
@@ -147,4 +154,17 @@ export const getAthleteLeaderboard = cache(async function getAthleteLeaderboard(
 
   rows.sort((a, b) => b.points - a.points);
   return rows;
-});
+}
+
+const cachedAthleteLeaderboard = unstable_cache(
+  computeAthleteLeaderboard,
+  ["athlete-leaderboard"],
+  { revalidate: 300, tags: ["athlete-leaderboard"] },
+);
+
+export async function getAthleteLeaderboard(
+  period: AthletePeriod,
+  reference = new Date(),
+): Promise<AthleteRankRow[]> {
+  return cachedAthleteLeaderboard(period, toDateInputValue(reference));
+}

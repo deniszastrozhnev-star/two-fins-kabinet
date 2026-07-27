@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDateRu } from "@/lib/dates";
+import { formatDateRu, parseDateInputValue } from "@/lib/dates";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 
 const TYPE_LABELS = { pool: "Бассейн", gym: "ОФП", flex: "Гибкость" } as const;
@@ -214,7 +214,7 @@ export default async function TrainerAthletesPage({
                     {row.lastName} {row.firstName}
                   </p>
                   <p className="mt-1 text-xs text-red-300">
-                    {row.missedDates.map((d) => formatDateRu(d)).join(", ")}
+                    {row.missedDates.map((d) => formatDateRu(parseDateInputValue(d))).join(", ")}
                   </p>
                 </li>
               ))}

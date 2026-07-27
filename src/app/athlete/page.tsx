@@ -10,7 +10,7 @@ import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
-import { formatDateRu } from "@/lib/dates";
+import { formatDateRu, parseDateInputValue } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/labels";
 import Link from "next/link";
 
@@ -93,8 +93,8 @@ export default async function AthletePage() {
                 </p>
                 <ul className="mt-1 flex flex-col gap-0.5">
                   {weekRow.missedDates.map((d) => (
-                    <li key={d.toISOString()} className="text-xs text-brand-text/50">
-                      −2 очка — нет записи за {formatDateRu(d)}
+                    <li key={d} className="text-xs text-brand-text/50">
+                      −2 очка — нет записи за {formatDateRu(parseDateInputValue(d))}
                     </li>
                   ))}
                 </ul>
@@ -124,8 +124,8 @@ export default async function AthletePage() {
                 </p>
                 <ul className="mt-1 flex max-h-32 flex-col gap-0.5 overflow-y-auto">
                   {monthRow.missedDates.map((d) => (
-                    <li key={d.toISOString()} className="text-xs text-brand-text/50">
-                      −2 очка — нет записи за {formatDateRu(d)}
+                    <li key={d} className="text-xs text-brand-text/50">
+                      −2 очка — нет записи за {formatDateRu(parseDateInputValue(d))}
                     </li>
                   ))}
                 </ul>
