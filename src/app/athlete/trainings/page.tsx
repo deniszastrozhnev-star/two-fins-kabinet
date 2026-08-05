@@ -16,7 +16,9 @@ import { FieldGroup, Input } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { toDateInputValue, parseDateInputValue, formatDateRu, formatDateShortRu } from "@/lib/dates";
+import { formatSwimTime } from "@/lib/swimTime";
 import { LEVEL_LABELS, TRAINING_LOG_TYPE_LABELS } from "@/lib/labels";
+import { Badge } from "@/components/ui/Badge";
 
 function MarkDoneForm({ type, label }: { type: "OFP" | "FLEXIBILITY"; label: string }) {
   return (
@@ -64,14 +66,49 @@ export default async function AthleteTrainingsPage({
   const period: AthletePeriod = params.period === "month" ? "month" : "week";
   const reference = params.ref ? parseDateInputValue(params.ref) : new Date();
 
-  const [athleteExtra, history] = await Promise.all([
+  const { start: periodStart, end: periodEnd } = getPeriodRange(period, reference);
+
+  const [athleteExtra, logHistory, poolWorkouts] = await Promise.all([
     prisma.athlete.findUnique({
       where: { id: athlete.id },
       select: { level: true },
     }),
     getTrainingLogHistory(athlete.id, period, reference),
+    prisma.poolWorkout.findMany({
+      where: { athleteId: athlete.id, date: { gte: periodStart, lte: periodEnd } },
+      orderBy: { date: "desc" },
+    }),
   ]);
   const level = athleteExtra?.level ?? null;
+
+  type HistoryRow = {
+    id: string;
+    date: Date;
+    kind: "log" | "pool";
+    label: string;
+    detail: string;
+  };
+
+  const history: HistoryRow[] = [
+    ...logHistory.map((h) => ({
+      id: h.id,
+      date: h.date,
+      kind: "log" as const,
+      label: TRAINING_LOG_TYPE_LABELS[h.type],
+      detail: `${h.durationMinutes} мин · ${LEVEL_LABELS[h.level]}`,
+    })),
+    ...poolWorkouts.map((w) => ({
+      id: w.id,
+      date: w.date,
+      kind: "pool" as const,
+      label: w.task,
+      detail: `${w.volumeMeters} м${
+        w.segmentDistance && w.segmentTimeCentis != null
+          ? ` · ${w.segmentDistance} за ${formatSwimTime(w.segmentTimeCentis)}`
+          : ""
+      }${w.feeling ? ` · ${w.feeling}` : ""}`,
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const taskDates = level ? await getLevelTrainingDates(level) : [];
   const selectedTaskDateStr = params.taskDate ?? toDateInputValue(taskDates[0]?.date ?? new Date());
@@ -86,7 +123,6 @@ export default async function AthleteTrainingsPage({
   const nextRef = toDateInputValue(
     period === "week" ? addWeeks(reference, 1) : addMonths(reference, 1),
   );
-  const { start: periodStart, end: periodEnd } = getPeriodRange(period, reference);
   const periodLabel =
     period === "week"
       ? `${formatDateShortRu(periodStart)} – ${formatDateRu(periodEnd)}`
@@ -174,7 +210,7 @@ export default async function AthleteTrainingsPage({
           <Card>
             <CardBody>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-heading text-lg font-bold">История отметок</h2>
+                <h2 className="font-heading text-lg font-bold">История тренировок</h2>
                 <div className="flex gap-1.5">
                   <Link
                     href={`/athlete/trainings?period=week&ref=${toDateInputValue(new Date())}&taskDate=${selectedTaskDateStr}`}
@@ -216,23 +252,30 @@ export default async function AthleteTrainingsPage({
               </div>
 
               {history.length === 0 ? (
-                <EmptyState title="За этот период отметок нет" />
+                <EmptyState title="За этот период записей нет" />
               ) : (
                 <ul className="flex flex-col divide-y divide-white/10">
                   {history.map((h) => (
-                    <li key={h.id} className="flex items-center justify-between gap-3 py-2">
+                    <li key={`${h.kind}-${h.id}`} className="flex items-center justify-between gap-3 py-2">
                       <div>
-                        <p className="text-sm font-medium">{TRAINING_LOG_TYPE_LABELS[h.type]}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={h.kind === "pool" ? "cyan" : "violet"}>
+                            {h.kind === "pool" ? "Бассейн" : h.label}
+                          </Badge>
+                          {h.kind === "pool" && <p className="text-sm font-medium">{h.label}</p>}
+                        </div>
                         <p className="mt-1 text-xs text-brand-text/50">
-                          {formatDateRu(h.date)} · {h.durationMinutes} мин · {LEVEL_LABELS[h.level]}
+                          {formatDateRu(h.date)} · {h.detail}
                         </p>
                       </div>
-                      <form action={deleteLevelTrainingLogAction}>
-                        <input type="hidden" name="id" value={h.id} />
-                        <ConfirmSubmitButton confirmMessage="Удалить эту отметку?">
-                          Удалить
-                        </ConfirmSubmitButton>
-                      </form>
+                      {h.kind === "log" && (
+                        <form action={deleteLevelTrainingLogAction}>
+                          <input type="hidden" name="id" value={h.id} />
+                          <ConfirmSubmitButton confirmMessage="Удалить эту отметку?">
+                            Удалить
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
                     </li>
                   ))}
                 </ul>

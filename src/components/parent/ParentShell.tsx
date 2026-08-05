@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/parent/rank-standards", label: "Разряды" },
   { href: "/parent/trainers", label: "Наши тренеры" },
   { href: "/parent/events", label: "Новости" },
+  { href: "/parent/install", label: "Установка" },
 ];
 
 export function ParentShell({

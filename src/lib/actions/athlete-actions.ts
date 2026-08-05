@@ -26,9 +26,19 @@ export async function addPoolWorkoutAction(
   const task = String(formData.get("task") ?? "").trim();
   const volumeMeters = Number(formData.get("volumeMeters") ?? "");
   const feeling = String(formData.get("feeling") ?? "").trim() || null;
+  const segmentDistance = String(formData.get("segmentDistance") ?? "").trim() || null;
+  const segmentTimeRaw = String(formData.get("segmentTime") ?? "").trim();
 
   if (!dateStr || !task || !Number.isFinite(volumeMeters) || volumeMeters <= 0) {
     return { error: "Заполните дату, задание и объём (метры)" };
+  }
+
+  let segmentTimeCentis: number | null = null;
+  if (segmentTimeRaw) {
+    segmentTimeCentis = parseSwimTime(segmentTimeRaw);
+    if (segmentTimeCentis === null) {
+      return { error: "Не удалось разобрать время со старта, формат: 32.45 или 1:02.34" };
+    }
   }
 
   await prisma.poolWorkout.create({
@@ -38,6 +48,8 @@ export async function addPoolWorkoutAction(
       task,
       volumeMeters: Math.round(volumeMeters),
       feeling,
+      segmentDistance: segmentTimeCentis !== null ? segmentDistance : null,
+      segmentTimeCentis,
     },
   });
 

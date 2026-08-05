@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDateRu, parseDateInputValue } from "@/lib/dates";
+import { formatDateRu } from "@/lib/dates";
+import { formatSwimTime } from "@/lib/swimTime";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 
 const TYPE_LABELS = { pool: "Бассейн", gym: "ОФП", flex: "Гибкость" } as const;
@@ -53,7 +54,11 @@ export default async function TrainerAthletesPage({
       date: w.date,
       athleteName: `${w.athlete.lastName} ${w.athlete.firstName}`,
       task: w.task,
-      detail: `${w.volumeMeters} м${w.feeling ? ` · ${w.feeling}` : ""}`,
+      detail: `${w.volumeMeters} м${
+        w.segmentDistance && w.segmentTimeCentis != null
+          ? ` · ${w.segmentDistance} за ${formatSwimTime(w.segmentTimeCentis)}`
+          : ""
+      }${w.feeling ? ` · ${w.feeling}` : ""}`,
     })),
     ...gymWorkouts.map((w) => ({
       id: w.id,
@@ -74,8 +79,6 @@ export default async function TrainerAthletesPage({
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 100);
-
-  const missedRows = board.filter((row) => row.missedDays > 0);
 
   return (
     <>
@@ -158,11 +161,6 @@ export default async function TrainerAthletesPage({
                       <span className="font-semibold text-brand-cyan">
                         {row.points.toFixed(1)}
                       </span>
-                      {row.missedDays > 0 && (
-                        <Badge tone="red" className="ml-2">
-                          −{row.missedDays} дн.
-                        </Badge>
-                      )}
                     </td>
                   </tr>
                   );
@@ -198,26 +196,6 @@ export default async function TrainerAthletesPage({
                     </ul>
                   </li>
                 ))}
-            </ul>
-          </CardBody>
-        </Card>
-      )}
-
-      {missedRows.length > 0 && (
-        <Card className="mb-6">
-          <CardBody>
-            <h2 className="mb-3 font-heading text-lg font-bold">Пропущенные дни</h2>
-            <ul className="flex flex-col divide-y divide-white/10">
-              {missedRows.map((row) => (
-                <li key={row.athleteId} className="py-2">
-                  <p className="text-sm font-medium">
-                    {row.lastName} {row.firstName}
-                  </p>
-                  <p className="mt-1 text-xs text-red-300">
-                    {row.missedDates.map((d) => formatDateRu(parseDateInputValue(d))).join(", ")}
-                  </p>
-                </li>
-              ))}
             </ul>
           </CardBody>
         </Card>

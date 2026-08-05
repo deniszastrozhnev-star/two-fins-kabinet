@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { formatDateRu } from "@/lib/dates";
+import { formatSwimTime } from "@/lib/swimTime";
 import {
   ATHLETE_RANK_COLORS,
   ATHLETE_RANK_LABELS,
@@ -106,6 +107,9 @@ export default async function TrainerAthleteDetailPage({
                     <p className="text-sm font-medium">{w.task}</p>
                     <p className="mt-1 text-xs text-brand-text/50">
                       {formatDateRu(w.date)} · {w.volumeMeters} м
+                      {w.segmentDistance && w.segmentTimeCentis != null
+                        ? ` · ${w.segmentDistance} за ${formatSwimTime(w.segmentTimeCentis)}`
+                        : ""}
                       {w.feeling ? ` · ${w.feeling}` : ""}
                     </p>
                   </li>

@@ -45,6 +45,18 @@ export function PoolWorkoutForm({ hasLinkedChild }: { hasLinkedChild: boolean })
       <FieldGroup label="Задание" htmlFor="poolTask">
         <Input id="poolTask" name="task" placeholder="4×100 кроль" required />
       </FieldGroup>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldGroup
+          label="Дистанция"
+          htmlFor="segmentDistance"
+          hint="Необязательно — если засекали время на отрезке"
+        >
+          <Input id="segmentDistance" name="segmentDistance" placeholder="50 м" />
+        </FieldGroup>
+        <FieldGroup label="Время со старта" htmlFor="segmentTime" hint="Формат: 32.45 или 1:02.34">
+          <Input id="segmentTime" name="segmentTime" placeholder="32.45" />
+        </FieldGroup>
+      </div>
       <FieldGroup label="Самочувствие" htmlFor="poolFeeling" hint="Что болит/не болит, где было тяжело">
         <Textarea id="poolFeeling" name="feeling" rows={2} />
       </FieldGroup>

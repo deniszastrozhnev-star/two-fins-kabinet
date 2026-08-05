@@ -10,7 +10,8 @@ import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { PoolWorkoutForm } from "@/components/athlete/PoolWorkoutForm";
 import { GymWorkoutForm } from "@/components/athlete/GymWorkoutForm";
 import { FlexibilityWorkoutForm } from "@/components/athlete/FlexibilityWorkoutForm";
-import { formatDateRu, parseDateInputValue } from "@/lib/dates";
+import { formatDateRu } from "@/lib/dates";
+import { formatSwimTime } from "@/lib/swimTime";
 import { LEVEL_LABELS } from "@/lib/labels";
 import Link from "next/link";
 
@@ -45,7 +46,11 @@ export default async function AthletePage() {
       type: "pool" as const,
       date: w.date,
       task: w.task,
-      detail: `${w.volumeMeters} м${w.feeling ? ` · ${w.feeling}` : ""}`,
+      detail: `${w.volumeMeters} м${
+        w.segmentDistance && w.segmentTimeCentis != null
+          ? ` · ${w.segmentDistance} за ${formatSwimTime(w.segmentTimeCentis)}`
+          : ""
+      }${w.feeling ? ` · ${w.feeling}` : ""}`,
     })),
     ...gymWorkouts.map((w) => ({
       id: w.id,
@@ -68,7 +73,29 @@ export default async function AthletePage() {
 
   return (
     <>
-      <PageHeader title="Дневник" description="Добавь тренировку и следи за своими показателями" />
+      <PageHeader title="Дневник" description="Запиши тренировку — остальное ниже" />
+
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-4 font-heading text-lg font-bold">Тренировка в бассейне</h2>
+          <PoolWorkoutForm hasLinkedChild={athleteExtra?.linkedChildId != null} />
+        </CardBody>
+      </Card>
+
+      <div className="mb-6 grid gap-6 sm:grid-cols-2">
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 font-heading text-lg font-bold">ОФП (зал)</h2>
+            <GymWorkoutForm />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 font-heading text-lg font-bold">Гибкость</h2>
+            <FlexibilityWorkoutForm />
+          </CardBody>
+        </Card>
+      </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Card>
@@ -85,20 +112,6 @@ export default async function AthletePage() {
               <p className="mt-2 text-sm text-brand-cyan">
                 Место в рейтинге: {weekIndex + 1} из {weekBoard.length}
               </p>
-            )}
-            {weekRow && weekRow.missedDays > 0 && (
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <p className="text-xs font-medium text-red-300">
-                  Штрафы за пропуски (−{weekRow.missedDays * 2} очков)
-                </p>
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {weekRow.missedDates.map((d) => (
-                    <li key={d} className="text-xs text-brand-text/50">
-                      −2 очка — нет записи за {formatDateRu(parseDateInputValue(d))}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             )}
           </CardBody>
         </Card>
@@ -117,20 +130,6 @@ export default async function AthletePage() {
                 Место в рейтинге: {monthIndex + 1} из {monthBoard.length}
               </p>
             )}
-            {monthRow && monthRow.missedDays > 0 && (
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <p className="text-xs font-medium text-red-300">
-                  Штрафы за пропуски (−{monthRow.missedDays * 2} очков)
-                </p>
-                <ul className="mt-1 flex max-h-32 flex-col gap-0.5 overflow-y-auto">
-                  {monthRow.missedDates.map((d) => (
-                    <li key={d} className="text-xs text-brand-text/50">
-                      −2 очка — нет записи за {formatDateRu(parseDateInputValue(d))}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </CardBody>
         </Card>
       </div>
@@ -142,7 +141,7 @@ export default async function AthletePage() {
             <>
               <p className="text-sm font-medium text-brand-cyan">{LEVEL_LABELS[level]}</p>
               <p className="mt-1 text-sm text-brand-text/60">
-                Задания по ОФП и гибкости — в разделе{" "}
+                Задания по ОФП и гибкости, а также история заплывов — в разделе{" "}
                 <Link href="/athlete/trainings" className="text-brand-cyan hover:underline">
                   «Тренировки»
                 </Link>
@@ -155,29 +154,6 @@ export default async function AthletePage() {
           )}
         </CardBody>
       </Card>
-
-      <div className="mb-6 grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-heading text-lg font-bold">
-              Тренировка в бассейне
-            </h2>
-            <PoolWorkoutForm hasLinkedChild={athleteExtra?.linkedChildId != null} />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-heading text-lg font-bold">ОФП (зал)</h2>
-            <GymWorkoutForm />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-heading text-lg font-bold">Гибкость</h2>
-            <FlexibilityWorkoutForm />
-          </CardBody>
-        </Card>
-      </div>
 
       <Card>
         <CardBody>
