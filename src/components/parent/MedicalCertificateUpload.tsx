@@ -1,16 +1,22 @@
 "use client";
 
-import { useActionState, useRef, useEffect } from "react";
+import { useActionState, useRef, useEffect, useState } from "react";
 import { uploadMedicalCertificateAction } from "@/lib/actions/medical-actions";
+import { compressImageClientSide } from "@/lib/imageClient";
 import { Input, Label } from "@/components/ui/Field";
-import { SaveButton } from "@/components/trainer/SaveButton";
+import { Button } from "@/components/ui/Button";
+
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export function MedicalCertificateUpload() {
-  const [state, formAction] = useActionState(
+  const [state, formAction, isActionPending] = useActionState(
     uploadMedicalCertificateAction,
     undefined,
   );
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [prepError, setPrepError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const pending = isPreparing || isActionPending;
 
   useEffect(() => {
     if (state?.success) {
@@ -18,8 +24,28 @@ export function MedicalCertificateUpload() {
     }
   }, [state]);
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPrepError(null);
+    const fd = new FormData(e.currentTarget);
+    const file = fd.get("certificate");
+    if (file instanceof File && file.size > 0) {
+      setIsPreparing(true);
+      const prepared = await compressImageClientSide(file);
+      setIsPreparing(false);
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        setPrepError(
+          "Файл слишком большой даже после сжатия. Сфотографируйте справку при хорошем освещении, или пришлите скриншот вместо фото.",
+        );
+        return;
+      }
+      fd.set("certificate", prepared);
+    }
+    formAction(fd);
+  }
+
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-3">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div>
         <input
           type="file"
@@ -36,9 +62,9 @@ export function MedicalCertificateUpload() {
         <Label htmlFor="validUntil">Анализы действительны до</Label>
         <Input id="validUntil" name="validUntil" type="date" required />
       </div>
-      {state?.error && (
+      {(prepError || state?.error) && (
         <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
-          {state.error}
+          {prepError ?? state?.error}
         </p>
       )}
       {state?.success && (
@@ -47,7 +73,9 @@ export function MedicalCertificateUpload() {
         </p>
       )}
       <div>
-        <SaveButton>Прикрепить справку</SaveButton>
+        <Button type="submit" disabled={pending}>
+          {isPreparing ? "Готовим фото…" : pending ? "Сохраняем…" : "Прикрепить справку"}
+        </Button>
       </div>
     </form>
   );
