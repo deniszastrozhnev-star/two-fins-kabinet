@@ -15,6 +15,12 @@ import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificate
 import { ContractUpload } from "@/components/parent/ContractUpload";
 import { StoryRail } from "@/components/shared/StoryRail";
 
+// Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
+// перекодирует в JPEG) — на Vercel по умолчанию Server Action может упереться
+// в дефолтный лимит времени функции ещё до того, как sharp успеет закончить
+// с крупным/детализированным снимком; поднимаем потолок явно.
+export const maxDuration = 60;
+
 const SBP_LINK =
   "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
