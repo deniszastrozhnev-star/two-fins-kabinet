@@ -17,7 +17,6 @@ export async function compressImageClientSide(
 ): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
 
-  console.log("[compressImageClientSide] start", file.name, file.type, file.size);
   try {
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -33,7 +32,6 @@ export async function compressImageClientSide(
       el.src = dataUrl;
     });
 
-    console.log("[compressImageClientSide] decoded", img.naturalWidth, img.naturalHeight);
     const scale = Math.min(1, maxWidth / img.naturalWidth);
     const width = Math.round(img.naturalWidth * scale);
     const height = Math.round(img.naturalHeight * scale);
@@ -48,16 +46,12 @@ export async function compressImageClientSide(
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", quality),
     );
-    console.log("[compressImageClientSide] blob", blob && blob.size, "orig", file.size);
     if (!blob || blob.size >= file.size) return file;
 
-    const result = new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", {
+    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", {
       type: "image/jpeg",
     });
-    console.log("[compressImageClientSide] result", result.size);
-    return result;
-  } catch (err) {
-    console.log("[compressImageClientSide] ERROR", String(err));
+  } catch {
     // Не смогли сжать (например, HEIC, который браузер не умеет декодировать
     // тегом <img>) — отправляем оригинал, дальше решает сервер как раньше.
     return file;

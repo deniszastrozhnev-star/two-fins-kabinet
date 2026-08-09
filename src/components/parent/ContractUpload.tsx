@@ -25,17 +25,14 @@ export function ContractUpload() {
   }, [state]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    console.log("[ContractUpload] handleSubmit fired");
     e.preventDefault();
     setPrepError(null);
     const fd = new FormData(e.currentTarget);
     const file = fd.get("contract");
-    console.log("[ContractUpload] file from fd", file instanceof File ? file.size : file);
     if (file instanceof File && file.size > 0) {
       setIsPreparing(true);
       const prepared = await compressImageClientSide(file);
       setIsPreparing(false);
-      console.log("[ContractUpload] prepared size", prepared.size, "threshold", MAX_UPLOAD_BYTES);
       if (prepared.size > MAX_UPLOAD_BYTES) {
         setPrepError(
           "Файл слишком большой даже после сжатия. Сфотографируйте договор при хорошем освещении без лишнего фона, или уменьшите разрешение/качество фото перед загрузкой.",
@@ -44,7 +41,6 @@ export function ContractUpload() {
       }
       fd.set("contract", prepared);
     }
-    console.log("[ContractUpload] dispatching formAction, fd contract size", (fd.get("contract") as File)?.size);
     formAction(fd);
   }
 
