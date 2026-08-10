@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Card, CardBody } from "@/components/ui/Card";
-import { InstallInstructions } from "@/components/InstallInstructions";
-import { TrainerIcon, ParentIcon, AthleteIcon, RegisterIcon } from "@/components/icons";
+import { TrainerIcon, ParentIcon, AthleteIcon, RegisterIcon, InstallIcon } from "@/components/icons";
 
 export default async function HomePage() {
   // PWA открывается со значка "На домой" всегда с этого адреса (start_url в
@@ -88,7 +87,7 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-6 border-t border-white/10 pt-6">
+        <div className="mt-6 flex flex-col gap-4 border-t border-white/10 pt-6">
           <Link href="/register">
             <Card className="text-left transition hover:border-brand-violet/50">
               <CardBody className="flex items-center justify-between">
@@ -109,11 +108,28 @@ export default async function HomePage() {
               </CardBody>
             </Card>
           </Link>
-        </div>
-      </div>
 
-      <div className="mt-4 w-full max-w-xl">
-        <InstallInstructions />
+          <Link href="/install">
+            <Card className="text-left transition hover:border-brand-cyan/50">
+              <CardBody className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-cyan/15 text-brand-cyan">
+                    <InstallIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-bold">Установить приложение</p>
+                    <p className="mt-1 text-sm text-brand-text/60">
+                      На экран «Домой» — Android и iPhone
+                    </p>
+                  </div>
+                </div>
+                <span aria-hidden className="text-xl text-brand-cyan">
+                  →
+                </span>
+              </CardBody>
+            </Card>
+          </Link>
+        </div>
       </div>
     </main>
   );
