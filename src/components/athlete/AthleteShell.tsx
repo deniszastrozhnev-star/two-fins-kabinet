@@ -16,7 +16,6 @@ const LINKS = [
   { href: "/athlete/competitions", label: "Соревнования" },
   { href: "/athlete/rank-standards", label: "Разряды" },
   { href: "/athlete/rating", label: "Рейтинг" },
-  { href: "/install", label: "Установка" },
 ];
 
 export function AthleteShell({

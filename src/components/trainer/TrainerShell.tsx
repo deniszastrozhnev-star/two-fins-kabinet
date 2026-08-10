@@ -13,7 +13,6 @@ const BASE_LINKS: NavLinkDef[] = [
   { href: "/trainer/rank-standards", label: "Разряды" },
   { href: "/trainer/athletes", label: "Спортсмены" },
   { href: "/trainer/events", label: "Новости и события" },
-  { href: "/install", label: "Установка" },
   { href: "/trainer/settings", label: "Настройки" },
 ];
 
