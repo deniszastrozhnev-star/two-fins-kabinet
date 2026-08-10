@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Card, CardBody } from "@/components/ui/Card";
 import { InstallInstructions } from "@/components/InstallInstructions";
+import { TrainerIcon, ParentIcon, AthleteIcon, RegisterIcon } from "@/components/icons";
 
 export default async function HomePage() {
   // PWA открывается со значка "На домой" всегда с этого адреса (start_url в
@@ -26,11 +27,16 @@ export default async function HomePage() {
           <Link href="/login">
             <Card className="text-left transition hover:border-brand-cyan/50">
               <CardBody className="flex items-center justify-between">
-                <div>
-                  <p className="font-heading text-lg font-bold">Я тренер</p>
-                  <p className="mt-1 text-sm text-brand-text/60">
-                    Вход по логину и паролю
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-cyan/15 text-brand-cyan">
+                    <TrainerIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-bold">Я тренер</p>
+                    <p className="mt-1 text-sm text-brand-text/60">
+                      Вход по логину и паролю
+                    </p>
+                  </div>
                 </div>
                 <span aria-hidden className="text-xl text-brand-cyan">
                   →
@@ -42,11 +48,16 @@ export default async function HomePage() {
           <Link href="/parent-login">
             <Card className="text-left transition hover:border-brand-violet/50">
               <CardBody className="flex items-center justify-between">
-                <div>
-                  <p className="font-heading text-lg font-bold">Я родитель</p>
-                  <p className="mt-1 text-sm text-brand-text/60">
-                    Вход по имени ребёнка и телефону
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-violet/15 text-brand-violet">
+                    <ParentIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-bold">Я родитель</p>
+                    <p className="mt-1 text-sm text-brand-text/60">
+                      Вход по имени ребёнка и телефону
+                    </p>
+                  </div>
                 </div>
                 <span aria-hidden className="text-xl text-brand-violet">
                   →
@@ -58,11 +69,16 @@ export default async function HomePage() {
           <Link href="/athlete-login">
             <Card className="text-left transition hover:border-brand-cyan/50">
               <CardBody className="flex items-center justify-between">
-                <div>
-                  <p className="font-heading text-lg font-bold">Я спортсмен</p>
-                  <p className="mt-1 text-sm text-brand-text/60">
-                    Дневник тренировок и рейтинг
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-cyan/15 text-brand-cyan">
+                    <AthleteIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-bold">Я спортсмен</p>
+                    <p className="mt-1 text-sm text-brand-text/60">
+                      Дневник тренировок и рейтинг
+                    </p>
+                  </div>
                 </div>
                 <span aria-hidden className="text-xl text-brand-cyan">
                   →
@@ -76,11 +92,16 @@ export default async function HomePage() {
           <Link href="/register">
             <Card className="text-left transition hover:border-brand-violet/50">
               <CardBody className="flex items-center justify-between">
-                <div>
-                  <p className="font-heading text-lg font-bold">Записаться в группу</p>
-                  <p className="mt-1 text-sm text-brand-text/60">
-                    Онлайн-запись без входа в кабинет
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-violet/15 text-brand-violet">
+                    <RegisterIcon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-lg font-bold">Записаться в группу</p>
+                    <p className="mt-1 text-sm text-brand-text/60">
+                      Онлайн-запись без входа в кабинет
+                    </p>
+                  </div>
                 </div>
                 <span aria-hidden className="text-xl text-brand-violet">
                   →

@@ -4,6 +4,7 @@ import { getAthleteLeaderboard, AthletePeriod } from "@/lib/athletes";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Avatar } from "@/components/shared/Avatar";
 
 export default async function AthleteRatingPage({
   searchParams,
@@ -70,8 +71,14 @@ export default async function AthleteRatingPage({
                       {period === "month" && i === 0 ? "🏆" : i + 1}
                     </td>
                     <td className="px-4 py-3 font-medium sm:px-5">
-                      <Link href={`/athlete/profile/${row.athleteId}`} className="hover:underline">
-                        {row.lastName} {row.firstName}
+                      <Link
+                        href={`/athlete/profile/${row.athleteId}`}
+                        className="flex items-center gap-2.5 hover:underline"
+                      >
+                        <Avatar name={`${row.lastName} ${row.firstName}`} url={row.avatarUrl} size={28} />
+                        <span>
+                          {row.lastName} {row.firstName}
+                        </span>
                       </Link>
                     </td>
                     <td className="px-4 py-3 sm:px-5">{row.poolVolumeMeters} м</td>

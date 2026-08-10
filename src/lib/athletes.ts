@@ -10,6 +10,7 @@ export type AthleteRankRow = {
   athleteId: string;
   lastName: string;
   firstName: string;
+  avatarUrl: string | null;
   poolVolumeMeters: number;
   gymMinutes: number;
   flexibilityMinutes: number;
@@ -63,7 +64,7 @@ async function computeAthleteLeaderboard(
       _sum: { durationMinutes: true },
     }),
     prisma.athlete.findMany({
-      select: { id: true, lastName: true, firstName: true },
+      select: { id: true, lastName: true, firstName: true, avatarUrl: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
   ]);
@@ -82,6 +83,7 @@ async function computeAthleteLeaderboard(
       athleteId: a.id,
       lastName: a.lastName,
       firstName: a.firstName,
+      avatarUrl: a.avatarUrl ? `/api/avatars/${a.id}` : null,
       poolVolumeMeters,
       gymMinutes,
       flexibilityMinutes,

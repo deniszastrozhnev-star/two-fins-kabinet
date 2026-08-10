@@ -1,4 +1,5 @@
 import { Card, CardBody } from "@/components/ui/Card";
+import { InstallIcon } from "@/components/icons";
 
 const ANDROID_STEPS = [
   "Откройте сайт в приложении Chrome (не через встроенный браузер мессенджера)",
@@ -33,10 +34,17 @@ export function InstallInstructions() {
   return (
     <Card className="text-left">
       <CardBody>
-        <h2 className="font-heading text-base font-bold">Установить как приложение</h2>
-        <p className="mt-1 text-sm text-brand-text/60">
-          Добавьте Two Fins на экран «Домой» — будет открываться как обычное приложение
-        </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-cyan/15 text-brand-cyan">
+            <InstallIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="font-heading text-base font-bold">Установить как приложение</h2>
+            <p className="mt-1 text-sm text-brand-text/60">
+              Добавьте Two Fins на экран «Домой» — будет открываться как обычное приложение
+            </p>
+          </div>
+        </div>
 
         <div className="mt-5 grid gap-6 sm:grid-cols-2">
           <div>
