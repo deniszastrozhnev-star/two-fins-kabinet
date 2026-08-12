@@ -3,16 +3,24 @@ import { requireHeadTrainer } from "@/lib/auth";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
+import { getFinanceSettings } from "@/lib/financeSettings";
+import { computeSalaryReport } from "@/lib/salary";
+import { MonthlyRentForm } from "@/components/trainer/MonthlyRentForm";
+import { startOfMonth } from "date-fns";
 
 const REVENUE_GOAL = 300_000;
 
 export default async function MetricsPage() {
   await requireHeadTrainer();
 
-  const groups = await prisma.group.findMany({
-    orderBy: [{ level: "asc" }, { name: "asc" }],
-    include: { _count: { select: { children: true } } },
-  });
+  const [groups, financeSettings, salaryRows] = await Promise.all([
+    prisma.group.findMany({
+      orderBy: [{ level: "asc" }, { name: "asc" }],
+      include: { _count: { select: { children: true } } },
+    }),
+    getFinanceSettings(),
+    computeSalaryReport(startOfMonth(new Date()), new Date()),
+  ]);
 
   const rows = groups.map((g) => ({
     id: g.id,
@@ -27,6 +35,10 @@ export default async function MetricsPage() {
 
   const totalRevenue = rows.reduce((sum, r) => sum + (r.revenue ?? 0), 0);
   const diff = REVENUE_GOAL - totalRevenue;
+
+  const monthlyRentRub = financeSettings.monthlyRentRub;
+  const trainerSalariesTotal = salaryRows.reduce((sum, r) => sum + r.total, 0);
+  const netProfit = totalRevenue - monthlyRentRub - trainerSalariesTotal;
 
   return (
     <>
@@ -86,15 +98,47 @@ export default async function MetricsPage() {
         </CardBody>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <h2 className="mb-3 font-heading text-lg font-bold">Оборот и чистая прибыль</h2>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardBody>
-            <p className="text-sm text-brand-text/60">Оценочная выручка</p>
+            <p className="text-sm text-brand-text/60">Оборот (оценка)</p>
             <p className="mt-1 font-heading text-2xl font-bold">
               {totalRevenue.toLocaleString("ru-RU")}₽
             </p>
           </CardBody>
         </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-brand-text/60">Аренда (все бассейны)</p>
+            <p className="mt-1 mb-3 font-heading text-2xl font-bold">
+              {monthlyRentRub.toLocaleString("ru-RU")}₽
+            </p>
+            <MonthlyRentForm monthlyRentRub={monthlyRentRub} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-brand-text/60">Зарплаты тренерам (с начала месяца)</p>
+            <p className="mt-1 font-heading text-2xl font-bold">
+              {trainerSalariesTotal.toLocaleString("ru-RU")}₽
+            </p>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-brand-text/60">Чистая прибыль</p>
+            <p
+              className={`mt-1 font-heading text-2xl font-bold ${netProfit >= 0 ? "text-emerald-300" : "text-red-300"}`}
+            >
+              {netProfit.toLocaleString("ru-RU")}₽
+            </p>
+          </CardBody>
+        </Card>
+      </div>
+
+      <h2 className="mb-3 font-heading text-lg font-bold">Цель по обороту</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardBody>
             <p className="text-sm text-brand-text/60">Цель</p>

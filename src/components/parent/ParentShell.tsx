@@ -16,11 +16,16 @@ export function ParentShell({
   children,
   childName,
   contractUploaded,
+  paymentOk,
+  medicalOk,
 }: {
   children: React.ReactNode;
   childName: string;
   contractUploaded: boolean;
+  paymentOk: boolean;
+  medicalOk: boolean;
 }) {
+  const allOk = contractUploaded && paymentOk && medicalOk;
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="border-b border-white/10 bg-brand-base/70 backdrop-blur-md sticky top-0 z-20">
@@ -53,14 +58,30 @@ export function ParentShell({
         </nav>
       </header>
 
-      {!contractUploaded && (
-        <a
-          href="/parent#contract"
-          className="block border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-center text-sm font-medium text-amber-200 transition hover:bg-amber-500/15 sm:px-6"
-        >
-          Пожалуйста, распечатайте, подпишите и загрузите договор →
-        </a>
-      )}
+      <a
+        href="/parent#contract"
+        className={`block border-b px-4 py-2 text-center text-xs font-medium transition sm:px-6 ${
+          allOk
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15"
+            : "border-red-500/30 bg-red-500/10 text-red-200 hover:bg-red-500/15"
+        }`}
+      >
+        {allOk ? (
+          "Оплата, справка и договор — всё в порядке ✓"
+        ) : (
+          <>
+            Требует внимания:{" "}
+            {[
+              !paymentOk && "оплата",
+              !medicalOk && "справка",
+              !contractUploaded && "договор",
+            ]
+              .filter(Boolean)
+              .join(", ")}{" "}
+            →
+          </>
+        )}
+      </a>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
         {children}

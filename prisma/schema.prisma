@@ -498,3 +498,11 @@ model EventSignup {
 
   @@unique([eventId, childId])
 }
+
+// Единственная строка глобальных финансовых настроек (аренда) — singleton-паттерн:
+// фиксированный литеральный id "singleton", читается/обновляется всегда по нему же.
+model FinanceSettings {
+  id             String   @id @default("singleton")
+  monthlyRentRub Int      @default(180000)
+  updatedAt      DateTime @updatedAt
+}

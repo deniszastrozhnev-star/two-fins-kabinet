@@ -20,18 +20,21 @@ export default async function ChildrenPage({
   await requireTrainer();
   const { q } = await searchParams;
 
-  const children = await prisma.child.findMany({
-    where: q
-      ? {
-          OR: [
-            { lastName: { contains: q, mode: "insensitive" } },
-            { firstName: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    include: { group: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-  });
+  const [children, totalChildren] = await Promise.all([
+    prisma.child.findMany({
+      where: q
+        ? {
+            OR: [
+              { lastName: { contains: q, mode: "insensitive" } },
+              { firstName: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
+      include: { group: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+    prisma.child.count(),
+  ]);
 
   const [balances, unviewedReceipts, certificates] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
@@ -60,6 +63,10 @@ export default async function ChildrenPage({
         description="Все ученики школы, оплата и остаток отработок"
         action={<LinkButton href="/trainer/children/new">+ Добавить ребёнка</LinkButton>}
       />
+
+      <p className="mb-4 text-sm text-brand-text/60">
+        Всего детей: <span className="font-heading text-lg font-bold text-brand-text">{totalChildren}</span>
+      </p>
 
       <div className="mb-5 max-w-sm">
         <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />

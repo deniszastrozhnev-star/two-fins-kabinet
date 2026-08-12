@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireParentChild } from "@/lib/auth";
 import { EVENT_TYPE_LABELS } from "@/lib/labels";
 import { formatDateRu } from "@/lib/dates";
+import { isEventPast, sortEventsByRelevance } from "@/lib/events";
 import { signUpForEventAction, cancelSignupAction } from "@/lib/actions/signup-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -9,22 +10,17 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EventSignupButton } from "@/components/parent/EventSignupButton";
 
-const TYPE_TONE = {
-  NEWS: "neutral",
-  GATHERING: "violet",
-  COMPETITION: "cyan",
-} as const;
-
 export default async function ParentEventsPage() {
   const child = await requireParentChild();
 
-  const [events, mySignups] = await Promise.all([
-    prisma.event.findMany({ orderBy: { dateStart: "desc" } }),
+  const [eventsRaw, mySignups] = await Promise.all([
+    prisma.event.findMany(),
     prisma.eventSignup.findMany({
       where: { childId: child.id },
       select: { eventId: true },
     }),
   ]);
+  const events = sortEventsByRelevance(eventsRaw);
   const signedUpIds = new Set(mySignups.map((s) => s.eventId));
 
   return (
@@ -43,14 +39,16 @@ export default async function ParentEventsPage() {
         <div className="flex flex-col gap-4">
           {events.map((event) => {
             const signedUp = signedUpIds.has(event.id);
+            const past = isEventPast(event);
             return (
-              <Card key={event.id}>
+              <Card key={event.id} className={past ? "opacity-60" : undefined}>
                 <CardBody>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <Badge tone={TYPE_TONE[event.type]}>
-                        {EVENT_TYPE_LABELS[event.type]}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral">{EVENT_TYPE_LABELS[event.type]}</Badge>
+                        {past && <Badge tone="neutral">Событие прошло</Badge>}
+                      </div>
                       <p className="mt-2 font-heading text-lg font-bold">
                         {event.title}
                       </p>
