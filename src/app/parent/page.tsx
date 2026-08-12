@@ -69,7 +69,7 @@ export default async function ParentOverviewPage() {
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
+        <Card className="scroll-mt-24" id="payment">
           <CardBody>
             <p className="text-sm text-brand-text/60">Оплата</p>
             <p className="mt-2 font-heading text-2xl font-bold">
@@ -179,12 +179,14 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        {results.length > 0 && (
-          <Card className="sm:col-span-2">
-            <CardBody>
-              <p className="mb-2 text-sm text-brand-text/60">
-                Результаты соревнований
-              </p>
+        <Card className="scroll-mt-24 sm:col-span-2" id="results">
+          <CardBody>
+            <p className="mb-2 text-sm text-brand-text/60">
+              Результаты соревнований
+            </p>
+            {results.length === 0 ? (
+              <p className="text-sm text-brand-text/50">Результатов пока нет</p>
+            ) : (
               <ul className="flex flex-col divide-y divide-white/10">
                 {results.map((r) => (
                   <li key={r.id} className="py-2">
@@ -195,9 +197,9 @@ export default async function ParentOverviewPage() {
                   </li>
                 ))}
               </ul>
-            </CardBody>
-          </Card>
-        )}
+            )}
+          </CardBody>
+        </Card>
       </div>
     </>
   );

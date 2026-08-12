@@ -1,4 +1,3 @@
-import { NavLink } from "@/components/NavLink";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -6,17 +5,31 @@ import { AvatarUpload } from "@/components/athlete/AvatarUpload";
 import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
 import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
 import { StoryRail } from "@/components/shared/StoryRail";
+import { NavCardGrid } from "@/components/shared/NavCardGrid";
+import type { NavCardItem } from "@/components/shared/NavCard";
+import { DiaryIcon, LevelTaskIcon, TrophyIcon, RatingIcon, StoriesIcon } from "@/components/icons";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 import type { AthleteRank, Gender } from "@prisma/client";
 import type { StoriesFeed } from "@/lib/stories";
 
-const LINKS = [
-  { href: "/athlete", label: "Дневник", exact: true },
-  { href: "/athlete/trainings", label: "Тренировки" },
-  { href: "/athlete/competitions", label: "Соревнования" },
-  { href: "/athlete/rank-standards", label: "Разряды" },
-  { href: "/athlete/rating", label: "Рейтинг" },
-];
+function navItems(weekPlace: number | null, weekTotal: number): NavCardItem[] {
+  const iconClass = "h-6 w-6";
+  return [
+    { href: "/athlete", label: "Дневник", icon: <DiaryIcon className={iconClass} />, exact: true },
+    { href: "/athlete/trainings", label: "Тренировки", icon: <LevelTaskIcon className={iconClass} /> },
+    { href: "/athlete/competitions", label: "Соревнования", icon: <TrophyIcon className={iconClass} /> },
+    { href: "/athlete/rank-standards", label: "Разряды", icon: <TrophyIcon className={iconClass} /> },
+    {
+      href: "/athlete/rating",
+      label: "Рейтинг",
+      icon: <RatingIcon className={iconClass} />,
+      badge: weekPlace
+        ? { label: `${weekPlace}/${weekTotal} место`, tone: "neutral" }
+        : undefined,
+    },
+    { href: "#stories", label: "Истории", icon: <StoriesIcon className={iconClass} /> },
+  ];
+}
 
 export function AthleteShell({
   children,
@@ -125,25 +138,14 @@ export function AthleteShell({
           </Card>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-6 scroll-mt-24" id="stories">
           <StoryRail feed={storiesFeed} ownName={athleteName} ownAvatarUrl={avatarUrl} />
         </div>
-      </div>
 
-      <nav className="mx-auto mt-4 flex w-full max-w-3xl gap-1 overflow-x-auto border-t border-white/10 px-4 pt-3">
-        {LINKS.map((link) => (
-          <NavLink
-            key={link.href}
-            href={link.href}
-            exact={link.exact}
-            className="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition"
-            activeClassName="-translate-y-px bg-brand-cyan/20 text-brand-cyan shadow-[0_4px_14px_-4px_rgba(140,64,252,0.55)] ring-1 ring-inset ring-brand-cyan/30"
-            inactiveClassName="text-brand-text/60 hover:bg-white/5 hover:text-brand-text"
-          >
-            {link.label}
-          </NavLink>
-        ))}
-      </nav>
+        <div className="mt-6">
+          <NavCardGrid items={navItems(weekPlace, weekTotal)} />
+        </div>
+      </div>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">{children}</main>
     </div>
