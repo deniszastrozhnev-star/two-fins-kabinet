@@ -34,11 +34,11 @@ export default async function MetricsPage() {
   }));
 
   const totalRevenue = rows.reduce((sum, r) => sum + (r.revenue ?? 0), 0);
-  const diff = REVENUE_GOAL - totalRevenue;
 
   const monthlyRentRub = financeSettings.monthlyRentRub;
   const trainerSalariesTotal = salaryRows.reduce((sum, r) => sum + r.total, 0);
   const netProfit = totalRevenue - monthlyRentRub - trainerSalariesTotal;
+  const diff = REVENUE_GOAL - netProfit;
 
   return (
     <>
@@ -99,49 +99,47 @@ export default async function MetricsPage() {
       </Card>
 
       <h2 className="mb-3 font-heading text-lg font-bold">Оборот и чистая прибыль</h2>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardBody>
-            <p className="text-sm text-brand-text/60">Оборот (оценка)</p>
-            <p className="mt-1 font-heading text-2xl font-bold">
+      <Card className="mb-6">
+        <CardBody className="flex flex-col divide-y divide-white/10 p-0">
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <p className="text-sm text-brand-text/70">Оборот (оценка)</p>
+            <p className="font-heading text-xl font-bold">
               {totalRevenue.toLocaleString("ru-RU")}₽
             </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-brand-text/60">Аренда (все бассейны)</p>
-            <p className="mt-1 mb-3 font-heading text-2xl font-bold">
-              {monthlyRentRub.toLocaleString("ru-RU")}₽
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div>
+              <p className="text-sm text-brand-text/70">− Аренда (все бассейны)</p>
+              <div className="mt-2">
+                <MonthlyRentForm monthlyRentRub={monthlyRentRub} />
+              </div>
+            </div>
+            <p className="font-heading text-xl font-bold text-red-300">
+              −{monthlyRentRub.toLocaleString("ru-RU")}₽
             </p>
-            <MonthlyRentForm monthlyRentRub={monthlyRentRub} />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-brand-text/60">Зарплаты тренерам (с начала месяца)</p>
-            <p className="mt-1 font-heading text-2xl font-bold">
-              {trainerSalariesTotal.toLocaleString("ru-RU")}₽
+          </div>
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <p className="text-sm text-brand-text/70">− Зарплаты тренерам (с начала месяца)</p>
+            <p className="font-heading text-xl font-bold text-red-300">
+              −{trainerSalariesTotal.toLocaleString("ru-RU")}₽
             </p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-brand-text/60">Чистая прибыль</p>
+          </div>
+          <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
+            <p className="font-heading text-base font-bold">= Чистая прибыль</p>
             <p
-              className={`mt-1 font-heading text-2xl font-bold ${netProfit >= 0 ? "text-emerald-300" : "text-red-300"}`}
+              className={`font-heading text-2xl font-bold ${netProfit >= 0 ? "text-emerald-300" : "text-red-300"}`}
             >
               {netProfit.toLocaleString("ru-RU")}₽
             </p>
-          </CardBody>
-        </Card>
-      </div>
+          </div>
+        </CardBody>
+      </Card>
 
-      <h2 className="mb-3 font-heading text-lg font-bold">Цель по обороту</h2>
+      <h2 className="mb-3 font-heading text-lg font-bold">Цель по чистой прибыли</h2>
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardBody>
-            <p className="text-sm text-brand-text/60">Цель</p>
+            <p className="text-sm text-brand-text/60">Цель (чистая прибыль)</p>
             <p className="mt-1 font-heading text-2xl font-bold">
               {REVENUE_GOAL.toLocaleString("ru-RU")}₽
             </p>

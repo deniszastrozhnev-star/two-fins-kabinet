@@ -36,7 +36,7 @@ export default async function ChildrenPage({
     prisma.child.count(),
   ]);
 
-  const [balances, unviewedReceipts, certificates] = await Promise.all([
+  const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
@@ -47,6 +47,10 @@ export default async function ChildrenPage({
       orderBy: { createdAt: "desc" },
       select: { childId: true, validUntil: true },
     }),
+    prisma.contractDocument.findMany({
+      where: { childId: { in: children.map((c) => c.id) } },
+      select: { childId: true },
+    }),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
   const latestValidUntilByChild = new Map<string, Date>();
@@ -55,6 +59,23 @@ export default async function ChildrenPage({
       latestValidUntilByChild.set(cert.childId, cert.validUntil);
     }
   }
+  const childrenWithContract = new Set(contracts.map((c) => c.childId));
+
+  const enrichedChildren = children.map((child) => {
+    const payment = getPaymentStatus(child.paidUntil);
+    const medical = getMedicalStatus(latestValidUntilByChild.get(child.id) ?? null);
+    const contractOk = childrenWithContract.has(child.id);
+    const paymentOk = payment.tone === "green";
+    const medicalOk = medical.tone === "green";
+    const hasIssue = !paymentOk || !medicalOk || !contractOk;
+    return { child, payment, medical, paymentOk, medicalOk, contractOk, hasIssue };
+  });
+  enrichedChildren.sort((a, b) => {
+    if (a.hasIssue !== b.hasIssue) return a.hasIssue ? -1 : 1;
+    const lastNameCmp = a.child.lastName.localeCompare(b.child.lastName, "ru");
+    if (lastNameCmp !== 0) return lastNameCmp;
+    return a.child.firstName.localeCompare(b.child.firstName, "ru");
+  });
 
   return (
     <>
@@ -89,12 +110,8 @@ export default async function ChildrenPage({
       ) : (
         <Card>
           <CardBody className="flex flex-col divide-y divide-white/10 p-0">
-            {children.map((child) => {
-              const payment = getPaymentStatus(child.paidUntil);
+            {enrichedChildren.map(({ child, paymentOk, medicalOk, contractOk }) => {
               const balance = balances.get(child.id) ?? 0;
-              const medical = getMedicalStatus(
-                latestValidUntilByChild.get(child.id) ?? null,
-              );
               return (
                 <Link
                   key={child.id}
@@ -110,21 +127,24 @@ export default async function ChildrenPage({
                       {formatPhone(child.parentPhone)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {child.status === "SICK" && (
                       <Badge tone="violet">болеет</Badge>
                     )}
                     {childrenWithNewReceipt.has(child.id) && (
                       <Badge tone="violet">есть чек</Badge>
                     )}
-                    {(medical.tone === "amber" || medical.tone === "red") && (
-                      <Badge tone={medical.tone}>{medical.label}</Badge>
-                    )}
                     {balance > 0 && (
                       <Badge tone="amber">{balance} отраб.</Badge>
                     )}
-                    <Badge tone={payment.tone === "neutral" ? "neutral" : payment.tone}>
-                      {payment.label}
+                    <Badge tone={paymentOk ? "green" : "red"}>
+                      Оплата {paymentOk ? "✅" : "❌"}
+                    </Badge>
+                    <Badge tone={medicalOk ? "green" : "red"}>
+                      Справка {medicalOk ? "✅" : "❌"}
+                    </Badge>
+                    <Badge tone={contractOk ? "green" : "red"}>
+                      Договор {contractOk ? "✅" : "❌"}
                     </Badge>
                   </div>
                 </Link>
