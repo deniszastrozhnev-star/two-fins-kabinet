@@ -157,6 +157,7 @@ export default async function GroupDetailPage({
                   pool: group.pool,
                   capacity: group.capacity,
                   pricePerMonth: group.pricePerMonth,
+                  chatUrl: group.chatUrl,
                 }}
               />
             </CardBody>

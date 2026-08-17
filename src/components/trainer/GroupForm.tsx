@@ -20,6 +20,7 @@ export function GroupForm({
     pool?: string;
     capacity?: number | null;
     pricePerMonth?: number | null;
+    chatUrl?: string | null;
   };
   submitLabel?: string;
 }) {
@@ -97,6 +98,20 @@ export function GroupForm({
           />
         </FieldGroup>
       </div>
+
+      <FieldGroup
+        label="Ссылка на чат MAX"
+        htmlFor="chatUrl"
+        hint="Родители этой группы увидят кнопку «Вступить в чат группы»"
+      >
+        <Input
+          id="chatUrl"
+          name="chatUrl"
+          type="url"
+          placeholder="https://max.ru/join/..."
+          defaultValue={initial?.chatUrl ?? ""}
+        />
+      </FieldGroup>
 
       <div className="mt-2 flex justify-end">
         <SaveButton>{submitLabel}</SaveButton>

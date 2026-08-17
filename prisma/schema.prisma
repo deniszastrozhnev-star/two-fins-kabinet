@@ -44,6 +44,7 @@ model Group {
   pool          String
   capacity      Int? // максимальная вместимость; без ограничения, если не задана
   pricePerMonth Int? // тариф ₽/мес — для оценки выручки
+  chatUrl       String? // ссылка-приглашение в чат MAX для родителей этой группы
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

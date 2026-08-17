@@ -55,6 +55,18 @@ export default async function ParentOverviewPage() {
             ? `${child.group.name} · ${LEVEL_LABELS[child.group.level]}`
             : "Группа пока не назначена"
         }
+        action={
+          child.group?.chatUrl ? (
+            <a
+              href={child.group.chatUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-violet px-4 py-2.5 text-sm font-semibold text-brand-text transition hover:brightness-110"
+            >
+              Вступить в чат группы
+            </a>
+          ) : undefined
+        }
       />
 
       <Card className="mb-6">
@@ -132,7 +144,12 @@ export default async function ParentOverviewPage() {
         <Card className="scroll-mt-24 sm:col-span-2" id="contract">
           <CardBody>
             <p className="text-sm text-brand-text/60">Медицинские документы</p>
-            <div className="mt-2">
+            <p className="mt-2 text-sm text-brand-text/70">
+              Нужна справка от педиатра (берётся раз в сезон, с указанием группы
+              здоровья). Для детей до 12 лет дополнительно нужны анализы (кал,
+              соскоб) — действуют 3 месяца.
+            </p>
+            <div className="mt-3">
               {latestCertificate ? (
                 <p className="text-sm text-brand-text/70">
                   Анализы действительны до{" "}

@@ -29,13 +29,14 @@ export async function createGroupAction(formData: FormData) {
   const pool = String(formData.get("pool") ?? "").trim();
   const capacity = readOptionalInt(formData, "capacity");
   const pricePerMonth = readOptionalInt(formData, "pricePerMonth");
+  const chatUrl = String(formData.get("chatUrl") ?? "").trim() || null;
 
   if (!name || !time || !pool) {
     throw new Error("Заполните название, время и бассейн группы");
   }
 
   await prisma.group.create({
-    data: { name, level, daysOfWeek, time, pool, capacity, pricePerMonth },
+    data: { name, level, daysOfWeek, time, pool, capacity, pricePerMonth, chatUrl },
   });
 
   revalidatePath("/trainer/schedule");
@@ -58,10 +59,11 @@ export async function updateGroupAction(formData: FormData) {
   const pool = String(formData.get("pool") ?? "").trim();
   const capacity = readOptionalInt(formData, "capacity");
   const pricePerMonth = readOptionalInt(formData, "pricePerMonth");
+  const chatUrl = String(formData.get("chatUrl") ?? "").trim() || null;
 
   await prisma.group.update({
     where: { id },
-    data: { name, level, daysOfWeek, time, pool, capacity, pricePerMonth },
+    data: { name, level, daysOfWeek, time, pool, capacity, pricePerMonth, chatUrl },
   });
 
   revalidatePath("/trainer/schedule");
