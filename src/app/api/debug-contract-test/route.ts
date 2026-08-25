@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { put, get, del } from "@vercel/blob";
-import { buildContractPdf } from "@/lib/contractPdf";
 
+// Inlined on purpose, without importing buildContractPdf (which imports sharp
+// at module scope) — isolating whether pdf-lib+blob alone crash, or whether
+// it's specifically the sharp import chain.
 export async function GET() {
   const steps: string[] = [];
   try {
@@ -26,19 +28,19 @@ export async function GET() {
     const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
     steps.push("fetched bytes: " + fetched.length);
 
-    const merged = await buildContractPdf([{ buffer: fetched, contentType: "application/pdf" }]);
-    steps.push("merged bytes: " + merged.length);
+    const merged = await PDFDocument.create();
+    const sourceDoc = await PDFDocument.load(fetched);
+    const copiedPages = await merged.copyPages(sourceDoc, sourceDoc.getPageIndices());
+    for (const copiedPage of copiedPages) {
+      merged.addPage(copiedPage);
+    }
+    const mergedBytes = Buffer.from(await merged.save());
+    steps.push("merged bytes: " + mergedBytes.length);
 
-    const check = await PDFDocument.load(merged);
+    const check = await PDFDocument.load(mergedBytes);
     steps.push("verified pages: " + check.getPageCount());
 
-    const finalBlob = await put(`diagnostics/debug-final-${Date.now()}.pdf`, merged, {
-      access: "private",
-      contentType: "application/pdf",
-    });
-    steps.push("final put: " + finalBlob.url);
-
-    await del([uploaded.url, finalBlob.url]);
+    await del([uploaded.url]);
     steps.push("cleaned up");
 
     return NextResponse.json({ ok: true, steps });
