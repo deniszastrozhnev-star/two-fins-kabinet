@@ -1,34 +1,30 @@
 import { NextResponse } from "next/server";
-import { put, get, del } from "@vercel/blob";
+import { PDFDocument } from "pdf-lib";
 
-// Even more isolated: no pdf-lib at all, just blob put/get to see if that
-// alone is what's crashing on Vercel (works fine locally either way).
+// Pure pdf-lib, no blob at all — isolating whether pdf-lib itself is what's
+// flaky on Vercel (blob put/get alone was confirmed reliable).
 export async function GET() {
-  const steps: string[] = [];
   try {
-    const uploaded = await put(`diagnostics/debug-${Date.now()}.txt`, "hello", {
-      access: "private",
-      contentType: "text/plain",
-    });
-    steps.push("put: " + uploaded.url);
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([200, 200]);
+    page.drawText("diag");
+    const pdfBytes = Buffer.from(await doc.save());
 
-    const result = await get(uploaded.url, { access: "private" });
-    steps.push("get statusCode: " + result?.statusCode);
-    if (!result || result.statusCode !== 200 || !result.stream) {
-      throw new Error("get() did not return a stream");
+    const merged = await PDFDocument.create();
+    const sourceDoc = await PDFDocument.load(pdfBytes);
+    const copiedPages = await merged.copyPages(sourceDoc, sourceDoc.getPageIndices());
+    for (const copiedPage of copiedPages) {
+      merged.addPage(copiedPage);
     }
-    const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
-    steps.push("fetched bytes: " + fetched.length + " content: " + fetched.toString("utf8"));
+    const mergedBytes = Buffer.from(await merged.save());
 
-    await del([uploaded.url]);
-    steps.push("cleaned up");
+    const check = await PDFDocument.load(mergedBytes);
 
-    return NextResponse.json({ ok: true, steps });
+    return NextResponse.json({ ok: true, pages: check.getPageCount(), bytes: mergedBytes.length });
   } catch (err) {
     return NextResponse.json(
       {
         ok: false,
-        steps,
         error: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
       },
