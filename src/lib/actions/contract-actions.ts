@@ -74,11 +74,17 @@ export async function uploadContractAction(
     "_",
   );
   const key = `contracts/${safeName}/${Date.now()}.pdf`;
-  const blob = await put(key, pdfBuffer, { access: "private", contentType: "application/pdf" });
 
-  await prisma.contractDocument.create({
-    data: { childId: child.id, fileUrl: blob.url, contentType: "application/pdf" },
-  });
+  try {
+    const blob = await put(key, pdfBuffer, { access: "private", contentType: "application/pdf" });
+
+    await prisma.contractDocument.create({
+      data: { childId: child.id, fileUrl: blob.url, contentType: "application/pdf" },
+    });
+  } catch (err) {
+    console.error("uploadContractAction: failed to save merged PDF", err);
+    return { error: "Не удалось сохранить договор, попробуйте ещё раз" };
+  }
 
   await del(pages.map((p) => p.url)).catch((err) => {
     console.error("uploadContractAction: failed to clean up temp page blobs", err);
