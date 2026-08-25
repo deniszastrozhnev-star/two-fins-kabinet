@@ -1,26 +1,34 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
-import { put, get, del } from "@vercel/blob";
+import { upload } from "@vercel/blob/client";
+import { get, del } from "@vercel/blob";
 
-export async function GET() {
+// Mimics the REAL production flow as closely as possible: client-token-based
+// direct upload (same as the browser does via ContractUpload.tsx), not the
+// server-side put() the earlier diagnostics used — those are different code
+// paths in @vercel/blob and may behave differently on Vercel.
+export async function GET(request: Request) {
   try {
     const doc = await PDFDocument.create();
     const page = doc.addPage([200, 200]);
     page.drawText("diag");
     const pdfBytes = Buffer.from(await doc.save());
 
-    const uploaded = await put(`diagnostics/debug-${Date.now()}.pdf`, pdfBytes, {
+    const origin = new URL(request.url).origin;
+    const cookie = request.headers.get("cookie") ?? "";
+
+    const blob = await upload(`contract-pages/diag-${Date.now()}.pdf`, pdfBytes, {
       access: "private",
+      handleUploadUrl: `${origin}/api/contracts/upload-token`,
       contentType: "application/pdf",
+      headers: { cookie },
     });
 
-    const result = await get(uploaded.url, { access: "private" });
+    const result = await get(blob.url, { access: "private" });
     if (!result || result.statusCode !== 200 || !result.stream) {
       throw new Error("get() did not return a stream");
     }
     const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
-
-    const sizesMatch = fetched.length === pdfBytes.length;
 
     const merged = await PDFDocument.create();
     const sourceDoc = await PDFDocument.load(fetched);
@@ -30,13 +38,12 @@ export async function GET() {
     }
     const mergedBytes = Buffer.from(await merged.save());
 
-    await del([uploaded.url]);
+    await del([blob.url]);
 
     return NextResponse.json({
       ok: true,
       originalBytes: pdfBytes.length,
       fetchedBytes: fetched.length,
-      sizesMatch,
       mergedBytes: mergedBytes.length,
     });
   } catch (err) {
