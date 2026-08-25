@@ -1,5 +1,4 @@
 import "server-only";
-import sharp from "sharp";
 
 const DEFAULT_MAX_WIDTH = 1600;
 
@@ -20,6 +19,11 @@ export async function resizeForUpload(
   }
 
   try {
+    // Ленивый импорт: грузить sharp только когда реально нужно обработать
+    // картинку — иначе PDF-загрузки (которые тоже проходят через эту функцию
+    // и сразу выходят по проверке выше) без надобности тянут sharp на
+    // холодном старте serverless-функции, а это иногда валит её целиком.
+    const sharp = (await import("sharp")).default;
     const resized = await sharp(original)
       .rotate() // учитывает EXIF-поворот с телефона
       .resize({ width: maxWidth, withoutEnlargement: true })

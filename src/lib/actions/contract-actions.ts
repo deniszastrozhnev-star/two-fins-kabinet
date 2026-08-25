@@ -31,6 +31,20 @@ export async function uploadContractAction(
 ): Promise<ActionState> {
   const child = await requireParentChild();
 
+  // Внешний предохранитель: что бы ни пошло не так ниже — родитель должен
+  // увидеть понятную ошибку с возможностью повторить, а не падение страницы.
+  try {
+    return await doUploadContract(child, formData);
+  } catch (err) {
+    console.error("uploadContractAction: unexpected failure", err);
+    return { error: "Не удалось сохранить договор, попробуйте ещё раз" };
+  }
+}
+
+async function doUploadContract(
+  child: { id: string; lastName: string; firstName: string },
+  formData: FormData,
+): Promise<ActionState> {
   let pages: UploadedPage[];
   try {
     pages = JSON.parse(String(formData.get("pages") ?? "[]"));

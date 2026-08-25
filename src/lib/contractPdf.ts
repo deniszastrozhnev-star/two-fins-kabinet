@@ -1,5 +1,4 @@
 import "server-only";
-import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 
 export type ContractPage = { buffer: Buffer; contentType: string };
@@ -15,7 +14,13 @@ export async function buildContractPdf(pages: ContractPage[]): Promise<Buffer> {
 
   for (const page of pages) {
     if (page.contentType === "application/pdf") {
-      const sourceDoc = await PDFDocument.load(page.buffer);
+      // ignoreEncryption/throwOnInvalidObject: некоторые PDF от сканер-приложений
+      // на телефоне выходят с шифрованием без пароля или мелкими структурными
+      // огрехами — pdf-lib по умолчанию строгий и падает на них.
+      const sourceDoc = await PDFDocument.load(page.buffer, {
+        ignoreEncryption: true,
+        throwOnInvalidObject: false,
+      });
       const copiedPages = await pdfDoc.copyPages(sourceDoc, sourceDoc.getPageIndices());
       for (const copiedPage of copiedPages) {
         pdfDoc.addPage(copiedPage);
@@ -23,6 +28,12 @@ export async function buildContractPdf(pages: ContractPage[]): Promise<Buffer> {
       continue;
     }
 
+    // Ленивый импорт: грузить sharp только когда реально нужно обработать
+    // картинку — иначе PDF-only загрузки без надобности тянут sharp на
+    // холодном старте serverless-функции, а это иногда валит её целиком
+    // (подтверждено на проде: неиспользуемый top-level import sharp здесь
+    // приводил к 500 даже когда обрабатывались только PDF-страницы).
+    const sharp = (await import("sharp")).default;
     const jpegBuffer = await sharp(page.buffer)
       .rotate()
       .resize({ width: 1600, withoutEnlargement: true })
