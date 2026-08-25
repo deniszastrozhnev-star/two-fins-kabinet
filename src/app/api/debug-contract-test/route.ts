@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
 import { put, get, del } from "@vercel/blob";
 
-// Inlined on purpose, without importing buildContractPdf (which imports sharp
-// at module scope) — isolating whether pdf-lib+blob alone crash, or whether
-// it's specifically the sharp import chain.
+// Even more isolated: no pdf-lib at all, just blob put/get to see if that
+// alone is what's crashing on Vercel (works fine locally either way).
 export async function GET() {
   const steps: string[] = [];
   try {
-    const doc = await PDFDocument.create();
-    const page = doc.addPage([200, 200]);
-    page.drawText("diag");
-    const pdfBytes = Buffer.from(await doc.save());
-    steps.push("created source pdf");
-
-    const uploaded = await put(`diagnostics/debug-${Date.now()}.pdf`, pdfBytes, {
+    const uploaded = await put(`diagnostics/debug-${Date.now()}.txt`, "hello", {
       access: "private",
-      contentType: "application/pdf",
+      contentType: "text/plain",
     });
-    steps.push("put to blob: " + uploaded.url);
+    steps.push("put: " + uploaded.url);
 
     const result = await get(uploaded.url, { access: "private" });
     steps.push("get statusCode: " + result?.statusCode);
@@ -26,19 +18,7 @@ export async function GET() {
       throw new Error("get() did not return a stream");
     }
     const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
-    steps.push("fetched bytes: " + fetched.length);
-
-    const merged = await PDFDocument.create();
-    const sourceDoc = await PDFDocument.load(fetched);
-    const copiedPages = await merged.copyPages(sourceDoc, sourceDoc.getPageIndices());
-    for (const copiedPage of copiedPages) {
-      merged.addPage(copiedPage);
-    }
-    const mergedBytes = Buffer.from(await merged.save());
-    steps.push("merged bytes: " + mergedBytes.length);
-
-    const check = await PDFDocument.load(mergedBytes);
-    steps.push("verified pages: " + check.getPageCount());
+    steps.push("fetched bytes: " + fetched.length + " content: " + fetched.toString("utf8"));
 
     await del([uploaded.url]);
     steps.push("cleaned up");
