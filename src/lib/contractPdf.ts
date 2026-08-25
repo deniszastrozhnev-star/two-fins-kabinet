@@ -15,7 +15,13 @@ export async function buildContractPdf(pages: ContractPage[]): Promise<Buffer> {
 
   for (const page of pages) {
     if (page.contentType === "application/pdf") {
-      const sourceDoc = await PDFDocument.load(page.buffer);
+      // ignoreEncryption/throwOnInvalidObject: некоторые PDF от сканер-приложений
+      // на телефоне выходят с шифрованием без пароля или мелкими структурными
+      // огрехами — pdf-lib по умолчанию строгий и падает на них.
+      const sourceDoc = await PDFDocument.load(page.buffer, {
+        ignoreEncryption: true,
+        throwOnInvalidObject: false,
+      });
       const copiedPages = await pdfDoc.copyPages(sourceDoc, sourceDoc.getPageIndices());
       for (const copiedPage of copiedPages) {
         pdfDoc.addPage(copiedPage);
