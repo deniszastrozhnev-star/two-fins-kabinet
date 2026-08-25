@@ -1,47 +1,87 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { put } from "@vercel/blob";
+import { put, get, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild } from "@/lib/auth";
-import { resizeForUpload } from "@/lib/image";
+import { buildContractPdf } from "@/lib/contractPdf";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
-const ALLOWED_CONTRACT_TYPES = [
+type UploadedPage = { url: string; contentType: string };
+
+const ALLOWED_PAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/heic",
   "application/pdf",
-];
+]);
 
+/**
+ * Страницы договора родитель загружает по одной напрямую в Vercel Blob
+ * (в обход лимита тела запроса serverless-функций) через ContractUpload.tsx —
+ * сюда приходит уже готовый список временных blob-URL, в порядке выбора.
+ * Экшен скачивает их, склеивает в один PDF (по странице на фото) и сохраняет
+ * как единый ContractDocument; временные blob'ы страниц удаляются.
+ */
 export async function uploadContractAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const child = await requireParentChild();
 
-  const file = formData.get("contract");
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "Выберите файл с подписанным договором (фото или PDF)" };
+  let pages: UploadedPage[];
+  try {
+    pages = JSON.parse(String(formData.get("pages") ?? "[]"));
+  } catch {
+    return { error: "Не удалось прочитать список страниц" };
   }
-  if (!ALLOWED_CONTRACT_TYPES.includes(file.type)) {
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    return { error: "Выберите хотя бы одну страницу договора (фото или PDF)" };
+  }
+  if (pages.some((p) => !p?.url || !ALLOWED_PAGE_TYPES.has(p.contentType))) {
     return { error: "Поддерживаются только изображения (JPG, PNG) и PDF" };
   }
 
-  const { buffer, contentType } = await resizeForUpload(file);
+  let fetchedPages: { buffer: Buffer; contentType: string }[];
+  try {
+    fetchedPages = await Promise.all(
+      pages.map(async (p) => {
+        const result = await get(p.url, { access: "private" });
+        if (!result || result.statusCode !== 200 || !result.stream) {
+          throw new Error("не удалось скачать загруженную страницу");
+        }
+        const buffer = Buffer.from(await new Response(result.stream).arrayBuffer());
+        return { buffer, contentType: p.contentType };
+      }),
+    );
+  } catch {
+    return { error: "Не удалось загрузить страницы договора, попробуйте ещё раз" };
+  }
+
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await buildContractPdf(fetchedPages);
+  } catch (err) {
+    console.error("uploadContractAction: buildContractPdf failed", err);
+    return { error: "Не удалось собрать PDF из выбранных страниц" };
+  }
 
   const safeName = `${child.lastName}-${child.firstName}`.replace(
     /[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g,
     "_",
   );
-  const key = `contracts/${safeName}/${Date.now()}-${file.name}`;
-
-  const blob = await put(key, buffer, { access: "private", contentType });
+  const key = `contracts/${safeName}/${Date.now()}.pdf`;
+  const blob = await put(key, pdfBuffer, { access: "private", contentType: "application/pdf" });
 
   await prisma.contractDocument.create({
-    data: { childId: child.id, fileUrl: blob.url, contentType },
+    data: { childId: child.id, fileUrl: blob.url, contentType: "application/pdf" },
+  });
+
+  await del(pages.map((p) => p.url)).catch((err) => {
+    console.error("uploadContractAction: failed to clean up temp page blobs", err);
   });
 
   revalidatePath("/trainer/children");
