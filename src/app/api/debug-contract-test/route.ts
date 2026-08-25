@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { upload } from "@vercel/blob/client";
 import { get, del } from "@vercel/blob";
+import { buildContractPdf } from "@/lib/contractPdf";
 
-// Mimics the REAL production flow as closely as possible: client-token-based
-// direct upload (same as the browser does via ContractUpload.tsx), not the
-// server-side put() the earlier diagnostics used — those are different code
-// paths in @vercel/blob and may behave differently on Vercel.
+// Identical to the previous diagnostic, except it now imports the REAL
+// buildContractPdf (which unconditionally imports sharp at module scope,
+// even though this PDF-only path never calls it) — isolating whether that
+// unused import alone is what's crashing cold Vercel lambdas.
 export async function GET(request: Request) {
   try {
     const doc = await PDFDocument.create();
@@ -30,13 +31,9 @@ export async function GET(request: Request) {
     }
     const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
 
-    const merged = await PDFDocument.create();
-    const sourceDoc = await PDFDocument.load(fetched);
-    const copiedPages = await merged.copyPages(sourceDoc, sourceDoc.getPageIndices());
-    for (const copiedPage of copiedPages) {
-      merged.addPage(copiedPage);
-    }
-    const mergedBytes = Buffer.from(await merged.save());
+    const mergedBytes = await buildContractPdf([
+      { buffer: fetched, contentType: "application/pdf" },
+    ]);
 
     await del([blob.url]);
 
