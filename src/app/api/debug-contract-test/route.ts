@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
+import { put, get, del } from "@vercel/blob";
 
-// Pure pdf-lib, no blob at all — isolating whether pdf-lib itself is what's
-// flaky on Vercel (blob put/get alone was confirmed reliable).
 export async function GET() {
   try {
     const doc = await PDFDocument.create();
@@ -10,17 +9,36 @@ export async function GET() {
     page.drawText("diag");
     const pdfBytes = Buffer.from(await doc.save());
 
+    const uploaded = await put(`diagnostics/debug-${Date.now()}.pdf`, pdfBytes, {
+      access: "private",
+      contentType: "application/pdf",
+    });
+
+    const result = await get(uploaded.url, { access: "private" });
+    if (!result || result.statusCode !== 200 || !result.stream) {
+      throw new Error("get() did not return a stream");
+    }
+    const fetched = Buffer.from(await new Response(result.stream).arrayBuffer());
+
+    const sizesMatch = fetched.length === pdfBytes.length;
+
     const merged = await PDFDocument.create();
-    const sourceDoc = await PDFDocument.load(pdfBytes);
+    const sourceDoc = await PDFDocument.load(fetched);
     const copiedPages = await merged.copyPages(sourceDoc, sourceDoc.getPageIndices());
     for (const copiedPage of copiedPages) {
       merged.addPage(copiedPage);
     }
     const mergedBytes = Buffer.from(await merged.save());
 
-    const check = await PDFDocument.load(mergedBytes);
+    await del([uploaded.url]);
 
-    return NextResponse.json({ ok: true, pages: check.getPageCount(), bytes: mergedBytes.length });
+    return NextResponse.json({
+      ok: true,
+      originalBytes: pdfBytes.length,
+      fetchedBytes: fetched.length,
+      sizesMatch,
+      mergedBytes: mergedBytes.length,
+    });
   } catch (err) {
     return NextResponse.json(
       {
