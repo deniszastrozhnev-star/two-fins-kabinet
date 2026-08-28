@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { parseDateInputValue } from "@/lib/dates";
+import { broadcastPush } from "@/lib/push";
 import type { EventType } from "@prisma/client";
 
 const VALID_TYPES: EventType[] = ["NEWS", "GATHERING", "COMPETITION"];
@@ -39,9 +40,18 @@ function readEventFields(formData: FormData) {
 export async function createEventAction(formData: FormData) {
   await requireTrainer();
   const data = readEventFields(formData);
-  await prisma.event.create({ data });
+  const event = await prisma.event.create({ data });
   revalidatePath("/trainer/events");
   revalidatePath("/parent", "layout");
+
+  // Не блокируем создание новости, если push не настроен или упал —
+  // ошибка отправки уведомлений не должна мешать тренеру опубликовать её.
+  await broadcastPush({
+    title: "Новое от Two Fins",
+    body: event.title,
+    url: "/parent/events",
+  }).catch((err) => console.error("createEventAction: push failed", err));
+
   redirect("/trainer/events");
 }
 

@@ -116,6 +116,15 @@ export function NewsIcon({ className = "" }: IconProps) {
   );
 }
 
+export function BellIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={base} className={className}>
+      <path d="M6 10a6 6 0 1112 0c0 3.5 1 5 2 6H4c1-1 2-2.5 2-6z" strokeLinejoin="round" />
+      <path d="M10 19a2 2 0 004 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function PersonalTrainingIcon({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={base} className={className}>

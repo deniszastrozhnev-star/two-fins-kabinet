@@ -85,6 +85,7 @@ model Child {
   waitlistEntries          GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
   linkedAthlete            Athlete?
+  pushSubscriptions        PushSubscription[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -498,6 +499,21 @@ model EventSignup {
   createdAt DateTime @default(now())
 
   @@unique([eventId, childId])
+}
+
+// Один родитель может открыть кабинет на нескольких устройствах — у каждого
+// своя подписка (endpoint уникален per браузер/устройство), поэтому это
+// список, а не одна запись на ребёнка.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([childId])
 }
 
 // Единственная строка глобальных финансовых настроек (аренда) — singleton-паттерн:

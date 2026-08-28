@@ -9,6 +9,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EventSignupButton } from "@/components/parent/EventSignupButton";
+import { PushNotificationPrompt } from "@/components/parent/PushNotificationPrompt";
 
 export default async function ParentEventsPage() {
   const child = await requireParentChild();
@@ -29,6 +30,8 @@ export default async function ParentEventsPage() {
         title="Новости и события"
         description="Новости, сборы и соревнования школы"
       />
+
+      <PushNotificationPrompt />
 
       {events.length === 0 ? (
         <EmptyState
