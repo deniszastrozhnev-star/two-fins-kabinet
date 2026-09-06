@@ -5,6 +5,7 @@ import { getWorkoffBalances } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatPhone } from "@/lib/phone";
+import { formatDateRu } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -20,10 +21,10 @@ export default async function ChildrenPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const { q } = await searchParams;
 
-  const [children, totalChildren] = await Promise.all([
+  const [children, totalChildren, allForDuplicateCheck] = await Promise.all([
     prisma.child.findMany({
       where: q
         ? {
@@ -37,7 +38,41 @@ export default async function ChildrenPage({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.child.count(),
+    // Дубликаты ищем по ВСЕЙ базе, а не по текущему (возможно, отфильтрованному
+    // поиском) списку — иначе поиск мог бы случайно скрыть одну из пары.
+    trainer.role === "HEAD"
+      ? prisma.child.findMany({
+          select: {
+            id: true,
+            lastName: true,
+            firstName: true,
+            birthDate: true,
+            group: { select: { name: true } },
+          },
+        })
+      : Promise.resolve(
+          [] as {
+            id: string;
+            lastName: string;
+            firstName: string;
+            birthDate: Date | null;
+            group: { name: string } | null;
+          }[],
+        ),
   ]);
+
+  // Совпадение по фамилии+имени (без учёта регистра/пробелов) — уже сигнал
+  // возможного дубля; совпадающая дата рождения делает его увереннее, но не
+  // обязательна (не у всех детей она вообще указана).
+  const duplicateGroupsByKey = new Map<string, typeof allForDuplicateCheck>();
+  for (const c of allForDuplicateCheck) {
+    const key = `${c.lastName.trim().toLowerCase()}|${c.firstName.trim().toLowerCase()}`;
+    const group = duplicateGroupsByKey.get(key);
+    if (group) group.push(c);
+    else duplicateGroupsByKey.set(key, [c]);
+  }
+  const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
+  const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
   const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
@@ -104,6 +139,36 @@ export default async function ChildrenPage({
         Всего детей: <span className="font-heading text-lg font-bold text-brand-text">{totalChildren}</span>
       </p>
 
+      {duplicateClusters.length > 0 && (
+        <Card className="mb-5 border-amber-500/30 bg-amber-500/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold text-amber-200">
+              Возможные дубликаты ({duplicateClusters.length})
+            </h2>
+            <div className="flex flex-col gap-2">
+              {duplicateClusters.map((cluster) => (
+                <div
+                  key={cluster.map((c) => c.id).join("-")}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-amber-500/20 bg-brand-base/40 px-3 py-2"
+                >
+                  {cluster.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/trainer/children/${c.id}`}
+                      className="text-sm text-brand-text hover:underline"
+                    >
+                      {c.lastName} {c.firstName}
+                      {c.birthDate && ` · ${formatDateRu(c.birthDate)}`}
+                      {c.group?.name && ` · ${c.group.name}`}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       <div className="mb-5 max-w-sm">
         <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />
       </div>
@@ -168,6 +233,9 @@ export default async function ChildrenPage({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {duplicateChildIds.has(child.id) && (
+                      <Badge tone="amber">Возможный дубликат</Badge>
+                    )}
                     {child.status === "SICK" && (
                       <Badge tone="violet">болеет</Badge>
                     )}
