@@ -12,6 +12,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkButton } from "@/components/ui/Button";
 import { SearchBox } from "@/components/trainer/SearchBox";
 
+// Ъ и Ь не встречаются как первая буква фамилии — не включаем в указатель.
+const RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ".split("");
+
 export default async function ChildrenPage({
   searchParams,
 }: {
@@ -77,6 +80,18 @@ export default async function ChildrenPage({
     return a.child.firstName.localeCompare(b.child.firstName, "ru");
   });
 
+  // Первое появление каждой буквы в ТЕКУЩЕМ порядке списка (а не в чисто
+  // алфавитном) — список сначала показывает детей с проблемами, поэтому буква
+  // может встречаться дважды (в группе "проблемы" и в группе "всё ок");
+  // указатель ведёт к первому вхождению.
+  const firstIdByLetter = new Map<string, string>();
+  for (const { child } of enrichedChildren) {
+    const letter = child.lastName[0]?.toUpperCase();
+    if (letter && !firstIdByLetter.has(letter)) {
+      firstIdByLetter.set(letter, child.id);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -92,6 +107,30 @@ export default async function ChildrenPage({
       <div className="mb-5 max-w-sm">
         <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />
       </div>
+
+      {children.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          {RUSSIAN_ALPHABET.map((letter) => {
+            const targetId = firstIdByLetter.get(letter);
+            return targetId ? (
+              <a
+                key={letter}
+                href={`#child-${targetId}`}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold text-brand-cyan transition hover:bg-white/10"
+              >
+                {letter}
+              </a>
+            ) : (
+              <span
+                key={letter}
+                className="flex h-7 w-7 items-center justify-center text-xs font-semibold text-brand-text/25"
+              >
+                {letter}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {children.length === 0 ? (
         <EmptyState
@@ -115,8 +154,9 @@ export default async function ChildrenPage({
               return (
                 <Link
                   key={child.id}
+                  id={`child-${child.id}`}
                   href={`/trainer/children/${child.id}`}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
+                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
                 >
                   <div>
                     <p className="font-medium">

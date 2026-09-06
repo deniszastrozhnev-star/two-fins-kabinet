@@ -47,7 +47,7 @@ export default async function ChildDetailPage({
   await markLatestReceiptViewed(id);
 
   const [
-    groups,
+    groupsRaw,
     balance,
     history,
     receipts,
@@ -59,7 +59,12 @@ export default async function ChildDetailPage({
   ] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        splitByAssignedTrainer: true,
+        trainers: { select: { id: true, username: true, displayName: true } },
+      },
     }),
     getWorkoffBalance(id),
     prisma.attendanceRecord.findMany({
@@ -93,6 +98,12 @@ export default async function ChildDetailPage({
       include: { group: true },
     }),
   ]);
+  const groups = groupsRaw.map((g) => ({
+    id: g.id,
+    name: g.name,
+    splitByAssignedTrainer: g.splitByAssignedTrainer,
+    trainers: g.trainers.map((t) => ({ id: t.id, name: t.displayName ?? t.username })),
+  }));
 
   const payment = getPaymentStatus(child.paidUntil);
   const medicalStatus = getMedicalStatus(certificates[0]?.validUntil ?? null);
@@ -137,6 +148,7 @@ export default async function ChildDetailPage({
                 lastName: child.lastName,
                 firstName: child.firstName,
                 groupId: child.groupId,
+                assignedTrainerId: child.assignedTrainerId,
                 parentPhone: child.parentPhone,
                 paidUntil: child.paidUntil,
                 birthDate: child.birthDate,

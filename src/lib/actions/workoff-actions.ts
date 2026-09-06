@@ -74,11 +74,12 @@ export async function saveWorkoffAttendanceAction(formData: FormData) {
 
   revalidatePath("/trainer/workoffs");
   revalidatePath("/trainer/attendance");
+  revalidatePath(`/trainer/attendance/${groupId}`);
   revalidatePath("/trainer/children");
   revalidatePath("/parent", "layout");
 
   const back = String(formData.get("back") ?? "");
   if (back === "attendance") {
-    redirect(`/trainer/attendance?groupId=${groupId}&date=${dateStr}`);
+    redirect(`/trainer/attendance/${groupId}?date=${dateStr}`);
   }
 }

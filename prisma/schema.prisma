@@ -25,7 +25,8 @@ model Trainer {
 
   attendanceRecords AttendanceRecord[]
   personalTrainings PersonalTraining[]
-  groups            Group[] @relation("TrainerGroups")
+  groups            Group[]            @relation("TrainerGroups")
+  assignedChildren  Child[]            @relation("AssignedTrainer")
 }
 
 enum GroupLevel {
@@ -36,17 +37,24 @@ enum GroupLevel {
 }
 
 model Group {
-  id            String   @id @default(cuid())
-  name          String
-  level         GroupLevel
-  daysOfWeek    String[] // напр. ["Пн", "Ср", "Пт"]
-  time          String // напр. "17:00–17:45"
-  pool          String
-  capacity      Int? // максимальная вместимость; без ограничения, если не задана
-  pricePerMonth Int? // тариф ₽/мес — для оценки выручки
-  chatUrl       String? // ссылка-приглашение в чат MAX для родителей этой группы
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                     String     @id @default(cuid())
+  name                   String
+  level                  GroupLevel
+  daysOfWeek             String[] // напр. ["Пн", "Ср", "Пт"]
+  time                   String // напр. "17:00–17:45"
+  pool                   String
+  capacity               Int? // максимальная вместимость; без ограничения, если не задана
+  pricePerMonth          Int? // тариф ₽/мес — для оценки выручки
+  chatUrl                String? // ссылка-приглашение в чат MAX для родителей этой группы
+  // Совместная группа (ведут 2 тренера на одном занятии): включает привязку
+  // "какой тренер отвечает за какого ребёнка" (Child.assignedTrainerId) — при
+  // отметке посещаемости каждый тренер видит всех детей группы, но отмечать и
+  // получать зарплату может только за привязанных к нему (+ ещё не привязанных).
+  // НЕ выводится автоматически из числа тренеров в relation `trainers` ниже —
+  // у группы может быть 2 тренера и без этого разделения (обычная подмена/бэкап).
+  splitByAssignedTrainer Boolean    @default(false)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   children                 Child[]
   attendanceRecords        AttendanceRecord[]        @relation("SessionGroup")
@@ -62,18 +70,22 @@ enum ChildStatus {
 }
 
 model Child {
-  id           String      @id @default(cuid())
-  lastName     String
-  firstName    String
-  groupId      String?
-  group        Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  parentPhone  String // хранится нормализованным (только цифры)
-  paidUntil    DateTime?
-  status       ChildStatus @default(ACTIVE)
-  note         String? // заметка тренера (например при звонке "холодному" ребёнку)
-  birthDate    DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  lastName          String
+  firstName         String
+  groupId           String?
+  group             Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  // Только для групп с Group.splitByAssignedTrainer=true — какой из двух
+  // тренеров группы физически отвечает за этого ребёнка (посещаемость/зарплата).
+  assignedTrainerId String?
+  assignedTrainer   Trainer?    @relation("AssignedTrainer", fields: [assignedTrainerId], references: [id], onDelete: SetNull)
+  parentPhone       String // хранится нормализованным (только цифры)
+  paidUntil         DateTime?
+  status            ChildStatus @default(ACTIVE)
+  note              String? // заметка тренера (например при звонке "холодному" ребёнку)
+  birthDate         DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   attendanceRecords        AttendanceRecord[]
   eventSignups             EventSignup[]
@@ -131,28 +143,28 @@ enum AttendanceStatus {
 }
 
 model AttendanceRecord {
-  id        String            @id @default(cuid())
-  childId   String
-  child     Child             @relation(fields: [childId], references: [id], onDelete: Cascade)
-  groupId   String
-  group     Group             @relation("SessionGroup", fields: [groupId], references: [id], onDelete: Cascade)
-  date      DateTime          @db.Date
-  status    AttendanceStatus
+  id                   String           @id @default(cuid())
+  childId              String
+  child                Child            @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId              String
+  group                Group            @relation("SessionGroup", fields: [groupId], references: [id], onDelete: Cascade)
+  date                 DateTime         @db.Date
+  status               AttendanceStatus
   // Если status = WORKOFF: какая группа/пропуск "закрывается" этой отработкой (для истории, не участвует в подсчёте остатка)
   workoffClosesGroupId String?
-  workoffClosesGroup    Group?  @relation("WorkoffClosesGroup", fields: [workoffClosesGroupId], references: [id], onDelete: SetNull)
+  workoffClosesGroup   Group?           @relation("WorkoffClosesGroup", fields: [workoffClosesGroupId], references: [id], onDelete: SetNull)
   // Тренер, который поставил эту отметку — используется для расчёта зарплаты
-  markedByTrainerId String
-  markedByTrainer   Trainer  @relation(fields: [markedByTrainerId], references: [id])
-  createdAt DateTime          @default(now())
+  markedByTrainerId    String
+  markedByTrainer      Trainer          @relation(fields: [markedByTrainerId], references: [id])
+  createdAt            DateTime         @default(now())
 
+  @@unique([childId, groupId, date])
   @@index([childId])
   @@index([groupId, date])
   @@index([markedByTrainerId, date])
   // Отчёт по зарплате считает по всем тренерам сразу за период (без фильтра
   // по markedByTrainerId/groupId) — без отдельного индекса это скан всей таблицы.
   @@index([date])
-  @@unique([childId, groupId, date])
 }
 
 enum PersonType {
@@ -371,19 +383,19 @@ model LevelTrainingLog {
 }
 
 model PoolWorkout {
-  id           String   @id @default(cuid())
-  athleteId    String
-  athlete      Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  date         DateTime @db.Date
-  task         String // что проплыли, напр. "4×100 кроль"
-  volumeMeters Int // объём за тренировку, метры
-  feeling      String? // самочувствие — что болит/не болит, где было тяжело
+  id                String   @id @default(cuid())
+  athleteId         String
+  athlete           Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  date              DateTime @db.Date
+  task              String // что проплыли, напр. "4×100 кроль"
+  volumeMeters      Int // объём за тренировку, метры
+  feeling           String? // самочувствие — что болит/не болит, где было тяжело
   // Время на отдельном отрезке внутри тренировки (не курсовка и не соревнование) —
   // напр. "проплыл 50м за 32.45" в рамках обычной тренировки. Оба поля опциональны,
   // заполняются только если на тренировке реально засекали время.
   segmentDistance   String? // напр. "50 м"
   segmentTimeCentis Int? // время отрезка в сотых долях секунды — см. src/lib/swimTime.ts
-  createdAt    DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   @@index([athleteId])
   // Рейтинг спортсменов (getAthleteLeaderboard) агрегирует по всем

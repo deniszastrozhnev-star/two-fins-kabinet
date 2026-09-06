@@ -9,6 +9,7 @@ import {
   MedicalIcon,
   WorkoffIcon,
   TrophyIcon,
+  MetricsIcon,
   NewsIcon,
   CalendarIcon,
   TrainerIcon,
@@ -24,6 +25,7 @@ export function ParentShell({
   medical,
   workoffBalance,
   resultsCount,
+  courseResultsCount,
 }: {
   children: React.ReactNode;
   childName: string;
@@ -32,6 +34,7 @@ export function ParentShell({
   medical: MedicalStatus;
   workoffBalance: number;
   resultsCount: number;
+  courseResultsCount: number;
 }) {
   const iconClass = "h-6 w-6";
   const items: NavCardItem[] = [
@@ -66,6 +69,12 @@ export function ParentShell({
       label: "Результаты",
       icon: <TrophyIcon className={iconClass} />,
       badge: { label: resultsCount > 0 ? `${resultsCount}` : "Нет", tone: "neutral" },
+    },
+    {
+      href: "/parent/course-results",
+      label: "Курсовка",
+      icon: <MetricsIcon className={iconClass} />,
+      badge: { label: courseResultsCount > 0 ? `${courseResultsCount}` : "Нет", tone: "neutral" },
     },
     { href: "/parent/events", label: "Новости", icon: <NewsIcon className={iconClass} /> },
     { href: "/parent/calendar", label: "Календарь", icon: <CalendarIcon className={iconClass} /> },

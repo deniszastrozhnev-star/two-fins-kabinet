@@ -12,21 +12,25 @@ export default async function ParentLayout({
   children: React.ReactNode;
 }) {
   const child = await requireParentChild();
-  const [contract, latestCertificate, workoffBalance, resultsCount] = await Promise.all([
-    prisma.contractDocument.findFirst({
-      where: { childId: child.id },
-      select: { id: true },
-    }),
-    prisma.medicalCertificate.findFirst({
-      where: { childId: child.id },
-      orderBy: { createdAt: "desc" },
-      select: { validUntil: true },
-    }),
-    getWorkoffBalance(child.id),
-    prisma.competitionResult.count({
-      where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
-    }),
-  ]);
+  const [contract, latestCertificate, workoffBalance, resultsCount, courseResultsCount] =
+    await Promise.all([
+      prisma.contractDocument.findFirst({
+        where: { childId: child.id },
+        select: { id: true },
+      }),
+      prisma.medicalCertificate.findFirst({
+        where: { childId: child.id },
+        orderBy: { createdAt: "desc" },
+        select: { validUntil: true },
+      }),
+      getWorkoffBalance(child.id),
+      prisma.competitionResult.count({
+        where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
+      }),
+      prisma.competitionResult.count({
+        where: { childId: child.id, competitionName: COURSE_RESULT_NAME },
+      }),
+    ]);
   const contractUploaded = contract != null;
   const payment = getPaymentStatus(child.paidUntil);
   const medical = getMedicalStatus(latestCertificate?.validUntil ?? null);
@@ -39,6 +43,7 @@ export default async function ParentLayout({
       medical={medical}
       workoffBalance={workoffBalance > 0 ? workoffBalance : 0}
       resultsCount={resultsCount}
+      courseResultsCount={courseResultsCount}
     >
       {children}
     </ParentShell>

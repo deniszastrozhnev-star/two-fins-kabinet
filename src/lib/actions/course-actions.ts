@@ -10,6 +10,7 @@ import { COURSE_DISTANCES } from "@/lib/labels";
 export async function saveCourseResultsAction(formData: FormData) {
   await requireTrainer();
 
+  const groupId = String(formData.get("groupId") ?? "");
   const dateStr = String(formData.get("date") ?? "");
   const distance = String(formData.get("distance") ?? "");
   if (!dateStr || !(COURSE_DISTANCES as readonly string[]).includes(distance)) {
@@ -27,5 +28,6 @@ export async function saveCourseResultsAction(formData: FormData) {
   }
 
   revalidatePath("/trainer/attendance");
-  revalidatePath("/parent");
+  if (groupId) revalidatePath(`/trainer/attendance/${groupId}`);
+  revalidatePath("/parent", "layout");
 }
