@@ -20,7 +20,7 @@ const OPTIONS: { value: AttendanceStatus; label: string; on: string }[] = [
 
 export function AttendanceStatusPicker({
   name,
-  defaultValue = "PRESENT",
+  defaultValue,
 }: {
   name: string;
   defaultValue?: AttendanceStatus;

@@ -108,7 +108,7 @@ export default async function WorkoffsPage({
         action={
           back === "attendance" ? (
             <Link
-              href={`/trainer/attendance?groupId=${groupId}&date=${dateStr}`}
+              href={`/trainer/attendance/${groupId}?date=${dateStr}`}
               className="text-sm text-brand-cyan hover:underline"
             >
               ← Назад к посещаемости

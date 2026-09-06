@@ -5,6 +5,7 @@ import { getWorkoffBalances } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatPhone } from "@/lib/phone";
+import { formatDateRu } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -12,15 +13,18 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkButton } from "@/components/ui/Button";
 import { SearchBox } from "@/components/trainer/SearchBox";
 
+// Ъ и Ь не встречаются как первая буква фамилии — не включаем в указатель.
+const RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ".split("");
+
 export default async function ChildrenPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const { q } = await searchParams;
 
-  const [children, totalChildren] = await Promise.all([
+  const [children, totalChildren, allForDuplicateCheck] = await Promise.all([
     prisma.child.findMany({
       where: q
         ? {
@@ -34,7 +38,41 @@ export default async function ChildrenPage({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.child.count(),
+    // Дубликаты ищем по ВСЕЙ базе, а не по текущему (возможно, отфильтрованному
+    // поиском) списку — иначе поиск мог бы случайно скрыть одну из пары.
+    trainer.role === "HEAD"
+      ? prisma.child.findMany({
+          select: {
+            id: true,
+            lastName: true,
+            firstName: true,
+            birthDate: true,
+            group: { select: { name: true } },
+          },
+        })
+      : Promise.resolve(
+          [] as {
+            id: string;
+            lastName: string;
+            firstName: string;
+            birthDate: Date | null;
+            group: { name: string } | null;
+          }[],
+        ),
   ]);
+
+  // Совпадение по фамилии+имени (без учёта регистра/пробелов) — уже сигнал
+  // возможного дубля; совпадающая дата рождения делает его увереннее, но не
+  // обязательна (не у всех детей она вообще указана).
+  const duplicateGroupsByKey = new Map<string, typeof allForDuplicateCheck>();
+  for (const c of allForDuplicateCheck) {
+    const key = `${c.lastName.trim().toLowerCase()}|${c.firstName.trim().toLowerCase()}`;
+    const group = duplicateGroupsByKey.get(key);
+    if (group) group.push(c);
+    else duplicateGroupsByKey.set(key, [c]);
+  }
+  const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
+  const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
   const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
@@ -77,6 +115,18 @@ export default async function ChildrenPage({
     return a.child.firstName.localeCompare(b.child.firstName, "ru");
   });
 
+  // Первое появление каждой буквы в ТЕКУЩЕМ порядке списка (а не в чисто
+  // алфавитном) — список сначала показывает детей с проблемами, поэтому буква
+  // может встречаться дважды (в группе "проблемы" и в группе "всё ок");
+  // указатель ведёт к первому вхождению.
+  const firstIdByLetter = new Map<string, string>();
+  for (const { child } of enrichedChildren) {
+    const letter = child.lastName[0]?.toUpperCase();
+    if (letter && !firstIdByLetter.has(letter)) {
+      firstIdByLetter.set(letter, child.id);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -89,9 +139,63 @@ export default async function ChildrenPage({
         Всего детей: <span className="font-heading text-lg font-bold text-brand-text">{totalChildren}</span>
       </p>
 
+      {duplicateClusters.length > 0 && (
+        <Card className="mb-5 border-amber-500/30 bg-amber-500/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold text-amber-200">
+              Возможные дубликаты ({duplicateClusters.length})
+            </h2>
+            <div className="flex flex-col gap-2">
+              {duplicateClusters.map((cluster) => (
+                <div
+                  key={cluster.map((c) => c.id).join("-")}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-amber-500/20 bg-brand-base/40 px-3 py-2"
+                >
+                  {cluster.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/trainer/children/${c.id}`}
+                      className="text-sm text-brand-text hover:underline"
+                    >
+                      {c.lastName} {c.firstName}
+                      {c.birthDate && ` · ${formatDateRu(c.birthDate)}`}
+                      {c.group?.name && ` · ${c.group.name}`}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       <div className="mb-5 max-w-sm">
         <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />
       </div>
+
+      {children.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          {RUSSIAN_ALPHABET.map((letter) => {
+            const targetId = firstIdByLetter.get(letter);
+            return targetId ? (
+              <a
+                key={letter}
+                href={`#child-${targetId}`}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold text-brand-cyan transition hover:bg-white/10"
+              >
+                {letter}
+              </a>
+            ) : (
+              <span
+                key={letter}
+                className="flex h-7 w-7 items-center justify-center text-xs font-semibold text-brand-text/25"
+              >
+                {letter}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {children.length === 0 ? (
         <EmptyState
@@ -115,8 +219,9 @@ export default async function ChildrenPage({
               return (
                 <Link
                   key={child.id}
+                  id={`child-${child.id}`}
                   href={`/trainer/children/${child.id}`}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
+                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
                 >
                   <div>
                     <p className="font-medium">
@@ -128,6 +233,9 @@ export default async function ChildrenPage({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {duplicateChildIds.has(child.id) && (
+                      <Badge tone="amber">Возможный дубликат</Badge>
+                    )}
                     {child.status === "SICK" && (
                       <Badge tone="violet">болеет</Badge>
                     )}

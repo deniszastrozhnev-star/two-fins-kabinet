@@ -9,10 +9,11 @@ import type { AttendanceStatus } from "@prisma/client";
 const VALID_STATUSES: AttendanceStatus[] = ["PRESENT", "ABSENT", "WORKOFF"];
 
 /**
- * Сохраняет посещаемость для набора детей на одном занятии (дата+группа).
- * Используется и обычным экраном "Посещаемость", и экраном "Отработки" —
- * в обоих случаях groupId — это группа/занятие, на котором физически была отметка,
- * а workoffClosesGroupId (когда статус WORKOFF) всегда берётся из текущей домашней
+ * Сохраняет посещаемость для набора детей на одном занятии (дата+группа) —
+ * основной экран "Посещаемость". Дети без выбранного статуса (трениер ещё не
+ * отметил) пропускаются — никакая запись для них не создаётся и не трогается,
+ * а не подставляется "Пришёл" по умолчанию.
+ * workoffClosesGroupId (когда статус WORKOFF) всегда берётся из текущей домашней
  * группы ребёнка на сервере, а не от клиента.
  */
 export async function saveAttendanceAction(formData: FormData) {
@@ -27,18 +28,22 @@ export async function saveAttendanceAction(formData: FormData) {
   }
   const date = parseDateInputValue(dateStr);
 
+  const markedChildIds = childIds.filter((childId) =>
+    VALID_STATUSES.includes(String(formData.get(`status-${childId}`) ?? "") as AttendanceStatus),
+  );
+  if (markedChildIds.length === 0) {
+    return;
+  }
+
   const children = await prisma.child.findMany({
-    where: { id: { in: childIds } },
+    where: { id: { in: markedChildIds } },
     select: { id: true, groupId: true },
   });
   const homeGroupById = new Map(children.map((c) => [c.id, c.groupId]));
 
   await prisma.$transaction(
-    childIds.map((childId) => {
-      const rawStatus = String(formData.get(`status-${childId}`) ?? "");
-      const status = VALID_STATUSES.includes(rawStatus as AttendanceStatus)
-        ? (rawStatus as AttendanceStatus)
-        : "PRESENT";
+    markedChildIds.map((childId) => {
+      const status = String(formData.get(`status-${childId}`)) as AttendanceStatus;
       const workoffClosesGroupId =
         status === "WORKOFF" ? (homeGroupById.get(childId) ?? groupId) : null;
 
@@ -58,6 +63,7 @@ export async function saveAttendanceAction(formData: FormData) {
   );
 
   revalidatePath("/trainer/attendance");
+  revalidatePath(`/trainer/attendance/${groupId}`);
   revalidatePath("/trainer/workoffs");
   revalidatePath("/trainer/children");
   revalidatePath("/parent", "layout");
