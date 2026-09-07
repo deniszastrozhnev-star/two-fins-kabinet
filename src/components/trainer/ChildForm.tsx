@@ -1,16 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { FieldGroup, Input, Select } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { toDateInputValue } from "@/lib/dates";
-
-type GroupOption = {
-  id: string;
-  name: string;
-  splitByAssignedTrainer: boolean;
-  trainers: { id: string; name: string }[];
-};
 
 export function ChildForm({
   action,
@@ -19,23 +11,18 @@ export function ChildForm({
   submitLabel = "Сохранить",
 }: {
   action: (formData: FormData) => void;
-  groups: GroupOption[];
+  groups: { id: string; name: string }[];
   initial?: {
     id?: string;
     lastName?: string;
     firstName?: string;
     groupId?: string | null;
-    assignedTrainerId?: string | null;
     parentPhone?: string;
     paidUntil?: Date | null;
     birthDate?: Date | null;
   };
   submitLabel?: string;
 }) {
-  const [groupId, setGroupId] = useState(initial?.groupId ?? "");
-  const selectedGroup = groups.find((g) => g.id === groupId);
-  const showAssignedTrainer = Boolean(selectedGroup?.splitByAssignedTrainer);
-
   return (
     <form action={action} className="flex flex-col gap-4">
       {initial?.id && <input type="hidden" name="id" value={initial.id} />}
@@ -59,12 +46,7 @@ export function ChildForm({
       </div>
 
       <FieldGroup label="Группа" htmlFor="groupId">
-        <Select
-          id="groupId"
-          name="groupId"
-          defaultValue={initial?.groupId ?? ""}
-          onChange={(e) => setGroupId(e.target.value)}
-        >
+        <Select id="groupId" name="groupId" defaultValue={initial?.groupId ?? ""}>
           <option value="">Без группы</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
@@ -73,27 +55,6 @@ export function ChildForm({
           ))}
         </Select>
       </FieldGroup>
-
-      {showAssignedTrainer && (
-        <FieldGroup
-          label="Ответственный тренер"
-          htmlFor="assignedTrainerId"
-          hint="Группу ведут два тренера — кто из них отвечает за этого ребёнка (посещаемость и зарплата)"
-        >
-          <Select
-            id="assignedTrainerId"
-            name="assignedTrainerId"
-            defaultValue={initial?.assignedTrainerId ?? ""}
-          >
-            <option value="">Не назначен</option>
-            {selectedGroup?.trainers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-        </FieldGroup>
-      )}
 
       <FieldGroup
         label="Телефон родителя"
