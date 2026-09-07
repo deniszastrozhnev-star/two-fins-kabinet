@@ -26,7 +26,6 @@ model Trainer {
   attendanceRecords AttendanceRecord[]
   personalTrainings PersonalTraining[]
   groups            Group[]            @relation("TrainerGroups")
-  assignedChildren  Child[]            @relation("AssignedTrainer")
 }
 
 enum GroupLevel {
@@ -46,12 +45,14 @@ model Group {
   capacity               Int? // максимальная вместимость; без ограничения, если не задана
   pricePerMonth          Int? // тариф ₽/мес — для оценки выручки
   chatUrl                String? // ссылка-приглашение в чат MAX для родителей этой группы
-  // Совместная группа (ведут 2 тренера на одном занятии): включает привязку
-  // "какой тренер отвечает за какого ребёнка" (Child.assignedTrainerId) — при
-  // отметке посещаемости каждый тренер видит всех детей группы, но отмечать и
-  // получать зарплату может только за привязанных к нему (+ ещё не привязанных).
-  // НЕ выводится автоматически из числа тренеров в relation `trainers` ниже —
-  // у группы может быть 2 тренера и без этого разделения (обычная подмена/бэкап).
+  // Совместная группа (ведут 2 тренера на одном занятии): привязка ребёнка к
+  // тренеру не постоянная, а решается динамически на каждое занятие — кто
+  // первым отметил AttendanceRecord.status для ребёнка на эту дату, тот его
+  // и "забрал" (markedByTrainerId), это и определяет зарплату. Не поставившие
+  // отметку видны обоим тренерам и доступны любому; уже отмеченные другим
+  // тренером — только для просмотра. НЕ выводится автоматически из числа
+  // тренеров в relation `trainers` ниже — у группы может быть 2 тренера и без
+  // этого разделения (обычная подмена/бэкап).
   splitByAssignedTrainer Boolean    @default(false)
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
@@ -70,22 +71,18 @@ enum ChildStatus {
 }
 
 model Child {
-  id                String      @id @default(cuid())
-  lastName          String
-  firstName         String
-  groupId           String?
-  group             Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  // Только для групп с Group.splitByAssignedTrainer=true — какой из двух
-  // тренеров группы физически отвечает за этого ребёнка (посещаемость/зарплата).
-  assignedTrainerId String?
-  assignedTrainer   Trainer?    @relation("AssignedTrainer", fields: [assignedTrainerId], references: [id], onDelete: SetNull)
-  parentPhone       String // хранится нормализованным (только цифры)
-  paidUntil         DateTime?
-  status            ChildStatus @default(ACTIVE)
-  note              String? // заметка тренера (например при звонке "холодному" ребёнку)
-  birthDate         DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id          String      @id @default(cuid())
+  lastName    String
+  firstName   String
+  groupId     String?
+  group       Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentPhone String // хранится нормализованным (только цифры)
+  paidUntil   DateTime?
+  status      ChildStatus @default(ACTIVE)
+  note        String? // заметка тренера (например при звонке "холодному" ребёнку)
+  birthDate   DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   attendanceRecords        AttendanceRecord[]
   eventSignups             EventSignup[]

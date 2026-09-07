@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
+import { getPaymentStatus } from "@/lib/payment";
 import { saveAttendanceAction } from "@/lib/actions/attendance-actions";
 import { saveCourseResultsAction } from "@/lib/actions/course-actions";
 import { COURSE_DISTANCES } from "@/lib/labels";
@@ -17,12 +18,21 @@ import { AttendanceStatusPicker } from "@/components/trainer/AttendanceStatusPic
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 
+function paymentLabel(paidUntil: Date | null): string {
+  if (!paidUntil) return "не оплачено";
+  const status = getPaymentStatus(paidUntil);
+  if (status.tone === "red") return "оплата просрочена";
+  const dd = String(paidUntil.getUTCDate()).padStart(2, "0");
+  const mm = String(paidUntil.getUTCMonth() + 1).padStart(2, "0");
+  return `оплачено до ${dd}.${mm}`;
+}
+
 export default async function AttendanceGroupPage({
   params,
   searchParams,
 }: {
   params: Promise<{ groupId: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; conflicts?: string }>;
 }) {
   const trainer = await requireTrainer();
   const { groupId } = await params;
@@ -36,19 +46,22 @@ export default async function AttendanceGroupPage({
 
   const dateStr = searchParamsResolved.date ?? toDateInputValue(new Date());
   const date = parseDateInputValue(dateStr);
+  const conflictChildIds = new Set(
+    searchParamsResolved.conflicts ? searchParamsResolved.conflicts.split(",") : [],
+  );
 
   const [children, records] = await Promise.all([
     prisma.child.findMany({
       where: { groupId },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      select: { id: true, lastName: true, firstName: true, assignedTrainerId: true },
+      select: { id: true, lastName: true, firstName: true, paidUntil: true },
     }),
     prisma.attendanceRecord.findMany({
       where: { groupId, date },
-      include: { child: true },
+      include: { child: true, markedByTrainer: { select: { username: true, displayName: true } } },
     }),
   ]);
-  const statusByChildId = new Map(records.map((r) => [r.childId, r.status]));
+  const recordByChildId = new Map(records.map((r) => [r.childId, r]));
   const homeChildIds = new Set(children.map((c) => c.id));
   // Дети из других групп, пришедшие на это занятие отработать/доп. занятием — добавлены через /trainer/workoffs
   const workoffVisitors = records.filter(
@@ -60,7 +73,7 @@ export default async function AttendanceGroupPage({
 
   // Присутствовавшие в этот день — своя группа (отмеченные "Пришёл") + пришедшие
   // на отработку/допзанятие из других групп — для внесения курсовки.
-  const homePresent = children.filter((c) => statusByChildId.get(c.id) === "PRESENT");
+  const homePresent = children.filter((c) => recordByChildId.get(c.id)?.status === "PRESENT");
   const courseChildren = [
     ...homePresent,
     ...workoffVisitors.map((r) => r.child),
@@ -97,6 +110,32 @@ export default async function AttendanceGroupPage({
           </div>
         }
       />
+
+      {conflictChildIds.size > 0 && (
+        <Card className="mb-6 border-amber-500/30 bg-amber-500/10">
+          <CardBody>
+            <p className="mb-2 text-sm font-semibold text-amber-200">
+              Не удалось отметить — уже отмечены другим тренером
+            </p>
+            <div className="flex flex-col gap-1">
+              {[...conflictChildIds].map((childId) => {
+                const child = children.find((c) => c.id === childId);
+                const record = recordByChildId.get(childId);
+                const ownerName = record
+                  ? (record.markedByTrainer.displayName ?? record.markedByTrainer.username)
+                  : "другим тренером";
+                if (!child) return null;
+                return (
+                  <p key={childId} className="text-sm text-amber-100/90">
+                    {child.lastName} {child.firstName} — уже отметил {ownerName}
+                    {record ? ` (${ATTENDANCE_STATUS_LABELS[record.status]})` : ""}
+                  </p>
+                );
+              })}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardBody>
@@ -163,14 +202,15 @@ export default async function AttendanceGroupPage({
           <Card>
             <CardBody className="flex flex-col divide-y divide-white/10 p-0">
               {children.map((child) => {
-                // В совместной группе каждый тренер отмечает только "своих"
-                // привязанных детей (+ ещё не привязанных) — остальных видит,
-                // но отметить не может; реально отмечает и получает за них
-                // зарплату тот тренер, к которому ребёнок привязан.
+                const record = recordByChildId.get(child.id);
+                // В совместной группе привязка к тренеру не постоянная: кто
+                // первым отметил ребёнка на это занятие, тот его и "забрал" —
+                // остальные видят отметку только для просмотра, кто её поставил.
+                // Неотмеченные и отметки самого тренера остаются редактируемыми.
                 const isLockedToOtherTrainer =
                   group.splitByAssignedTrainer &&
-                  child.assignedTrainerId != null &&
-                  child.assignedTrainerId !== trainer.id;
+                  record != null &&
+                  record.markedByTrainerId !== trainer.id;
 
                 return (
                   <div
@@ -180,19 +220,21 @@ export default async function AttendanceGroupPage({
                     {!isLockedToOtherTrainer && (
                       <input type="hidden" name="childId" value={child.id} />
                     )}
-                    <span className="font-medium">
-                      {child.lastName} {child.firstName}
-                    </span>
+                    <div>
+                      <p className="font-medium">
+                        {child.lastName} {child.firstName}
+                      </p>
+                      <p className="text-xs text-brand-text/50">{paymentLabel(child.paidUntil)}</p>
+                    </div>
                     {isLockedToOtherTrainer ? (
                       <Badge tone="neutral">
-                        {statusByChildId.has(child.id)
-                          ? ATTENDANCE_STATUS_LABELS[statusByChildId.get(child.id)!]
-                          : "Отмечает другой тренер"}
+                        {ATTENDANCE_STATUS_LABELS[record!.status]} ·{" "}
+                        {record!.markedByTrainer.displayName ?? record!.markedByTrainer.username}
                       </Badge>
                     ) : (
                       <AttendanceStatusPicker
                         name={`status-${child.id}`}
-                        defaultValue={statusByChildId.get(child.id)}
+                        defaultValue={record?.status}
                       />
                     )}
                   </div>

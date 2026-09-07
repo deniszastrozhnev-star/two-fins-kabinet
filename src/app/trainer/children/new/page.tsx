@@ -7,21 +7,10 @@ import { ChildForm } from "@/components/trainer/ChildForm";
 
 export default async function NewChildPage() {
   await requireTrainer();
-  const groupsRaw = await prisma.group.findMany({
+  const groups = await prisma.group.findMany({
     orderBy: [{ level: "asc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      splitByAssignedTrainer: true,
-      trainers: { select: { id: true, username: true, displayName: true } },
-    },
+    select: { id: true, name: true },
   });
-  const groups = groupsRaw.map((g) => ({
-    id: g.id,
-    name: g.name,
-    splitByAssignedTrainer: g.splitByAssignedTrainer,
-    trainers: g.trainers.map((t) => ({ id: t.id, name: t.displayName ?? t.username })),
-  }));
 
   return (
     <>

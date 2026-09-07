@@ -13,7 +13,6 @@ function readChildFields(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const firstName = String(formData.get("firstName") ?? "").trim();
   const groupId = String(formData.get("groupId") ?? "") || null;
-  const assignedTrainerId = String(formData.get("assignedTrainerId") ?? "") || null;
   const parentPhone = normalizePhone(String(formData.get("parentPhone") ?? ""));
   const paidUntilRaw = String(formData.get("paidUntil") ?? "");
   const paidUntil = paidUntilRaw ? parseDateInputValue(paidUntilRaw) : null;
@@ -24,7 +23,7 @@ function readChildFields(formData: FormData) {
     throw new Error("Укажите фамилию и имя ребёнка");
   }
 
-  return { lastName, firstName, groupId, assignedTrainerId, parentPhone, paidUntil, birthDate };
+  return { lastName, firstName, groupId, parentPhone, paidUntil, birthDate };
 }
 
 export async function createChildAction(formData: FormData) {
