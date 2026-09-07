@@ -11,7 +11,8 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Input, FieldGroup, Select } from "@/components/ui/Field";
+import { Select } from "@/components/ui/Field";
+import { AttendanceDateFilter } from "@/components/trainer/AttendanceDateFilter";
 import { AttendanceStatusPicker } from "@/components/trainer/AttendanceStatusPicker";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
@@ -99,17 +100,7 @@ export default async function AttendanceGroupPage({
 
       <Card className="mb-6">
         <CardBody>
-          <form action={`/trainer/attendance/${groupId}`} method="get" className="max-w-[220px]">
-            <FieldGroup label="Дата" htmlFor="date">
-              <Input
-                id="date"
-                type="date"
-                name="date"
-                defaultValue={dateStr}
-                onChange={(e) => e.currentTarget.form?.requestSubmit()}
-              />
-            </FieldGroup>
-          </form>
+          <AttendanceDateFilter groupId={groupId} date={dateStr} />
         </CardBody>
       </Card>
 
