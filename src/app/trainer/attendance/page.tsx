@@ -36,20 +36,22 @@ export default async function AttendanceGroupPickerPage() {
                 <h2 className="mb-3 font-heading text-lg font-bold text-brand-cyan">
                   {LEVEL_LABELS[level]}
                 </h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {levelGroups.map((group) => (
                     <Link key={group.id} href={`/trainer/attendance/${group.id}`}>
                       <Card className="h-full transition hover:border-brand-cyan/50">
-                        <CardBody>
-                          <p className="font-heading text-base font-bold">{group.name}</p>
-                          <p className="mt-2 text-sm text-brand-text/60">
+                        <CardBody className="p-3">
+                          <p className="font-heading text-sm font-bold leading-tight">
+                            {group.name}
+                          </p>
+                          <p className="mt-1.5 text-xs text-brand-text/60">
                             {group.daysOfWeek.length > 0
                               ? group.daysOfWeek.join(", ")
                               : "Дни не указаны"}
                             {" · "}
                             {group.time}
                           </p>
-                          <p className="mt-1 text-sm text-brand-text/50">
+                          <p className="mt-0.5 text-xs text-brand-text/50">
                             {group._count.children} детей
                           </p>
                         </CardBody>
