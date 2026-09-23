@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { get } from "@vercel/blob";
+import { get } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 

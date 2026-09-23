@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { put } from "@vercel/blob";
+import { put } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireAthlete } from "@/lib/auth";
 import { resizeForUpload } from "@/lib/image";
