@@ -32,6 +32,14 @@ const nextConfig: NextConfig = {
       "./node_modules/regenerator-runtime/**",
       "./node_modules/zlibjs/**",
       "./node_modules/wasm-feature-detect/**",
+      // serverExternalPackages выше исключает sharp из бандлинга, но не гарантирует,
+      // что автотрассировщик подхватит его платформенный нативный биндинг для КАЖДОГО
+      // serverless-маршрута — на проде это привело к ERR_DLOPEN_FAILED
+      // (libvips-cpp.so не найден) конкретно в функции загрузки договора, хотя чек и
+      // справка (тот же sharp, тот же ленивый импорт) работали нормально. Явно
+      // указываем нужные платформенные пакеты, как уже сделано для tesseract.js.
+      "./node_modules/@img/sharp-linux-x64/**",
+      "./node_modules/@img/sharp-libvips-linux-x64/**",
     ],
   },
 };
