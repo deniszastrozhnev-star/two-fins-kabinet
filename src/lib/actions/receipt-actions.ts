@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { endOfMonth } from "date-fns";
-import { put } from "@vercel/blob";
+import { put } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild, requireTrainer } from "@/lib/auth";
 import { resizeForUpload } from "@/lib/image";
