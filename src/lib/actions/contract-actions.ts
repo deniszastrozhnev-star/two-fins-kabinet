@@ -37,7 +37,8 @@ export async function uploadContractAction(
     return await doUploadContract(child, formData);
   } catch (err) {
     console.error("uploadContractAction: unexpected failure", err);
-    return { error: "Не удалось сохранить договор, попробуйте ещё раз" };
+    const diag = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return { error: `DIAG-OUTER: ${diag}` };
   }
 }
 
@@ -80,7 +81,9 @@ async function doUploadContract(
     pdfBuffer = await buildContractPdf(fetchedPages);
   } catch (err) {
     console.error("uploadContractAction: buildContractPdf failed", err);
-    return { error: "Не удалось собрать PDF из выбранных страниц" };
+    const diag =
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return { error: `DIAG: ${diag}` };
   }
 
   const safeName = `${child.lastName}-${child.firstName}`.replace(
