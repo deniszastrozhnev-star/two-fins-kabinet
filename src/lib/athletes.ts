@@ -27,14 +27,14 @@ export function getPeriodRange(period: AthletePeriod, reference = new Date()) {
   return { start: startOfMonth(reference), end: endOfMonth(reference) };
 }
 
-export function computeAthletePoints(volumeMeters: number, gymMinutes: number): number {
-  return volumeMeters / 100 + gymMinutes / 10;
+export function computeAthletePoints(volumeMeters: number): number {
+  return volumeMeters / 100;
 }
 
 /**
  * Рейтинг всех спортсменов за неделю/месяц, отсортированный по очкам.
- * Очки = объём/100 + минуты ОФП/10. Гибкость в саму формулу очков не входит,
- * учитывается отдельной колонкой.
+ * Очки = объём/100 — только по объёму в бассейне. ОФП (зал) и гибкость в саму
+ * формулу очков не входят, учитываются отдельными колонками.
  *
  * Кэшируется на 5 минут (across requests, не только в рамках одного рендера) —
  * рейтинг не обязан быть посекундно точным, а без кэша это самый частый и самый
@@ -77,7 +77,7 @@ async function computeAthleteLeaderboard(
     const poolVolumeMeters = poolByAthlete.get(a.id) ?? 0;
     const gymMinutes = gymByAthlete.get(a.id) ?? 0;
     const flexibilityMinutes = flexByAthlete.get(a.id) ?? 0;
-    const points = computeAthletePoints(poolVolumeMeters, gymMinutes);
+    const points = computeAthletePoints(poolVolumeMeters);
 
     return {
       athleteId: a.id,

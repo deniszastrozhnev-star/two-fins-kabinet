@@ -8,38 +8,18 @@ import { formatPhone } from "@/lib/phone";
 import { formatDateRu } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkButton } from "@/components/ui/Button";
-import { SearchBox } from "@/components/trainer/SearchBox";
+import { ChildrenList, type ChildListItem } from "@/components/trainer/ChildrenList";
 
-// Ъ и Ь не встречаются как первая буква фамилии — не включаем в указатель.
-const RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ".split("");
-
-export default async function ChildrenPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+export default async function ChildrenPage() {
   const trainer = await requireTrainer();
-  const { q } = await searchParams;
 
   const [children, totalChildren, allForDuplicateCheck] = await Promise.all([
     prisma.child.findMany({
-      where: q
-        ? {
-            OR: [
-              { lastName: { contains: q, mode: "insensitive" } },
-              { firstName: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
       include: { group: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.child.count(),
-    // Дубликаты ищем по ВСЕЙ базе, а не по текущему (возможно, отфильтрованному
-    // поиском) списку — иначе поиск мог бы случайно скрыть одну из пары.
     trainer.role === "HEAD"
       ? prisma.child.findMany({
           select: {
@@ -115,17 +95,22 @@ export default async function ChildrenPage({
     return a.child.firstName.localeCompare(b.child.firstName, "ru");
   });
 
-  // Первое появление каждой буквы в ТЕКУЩЕМ порядке списка (а не в чисто
-  // алфавитном) — список сначала показывает детей с проблемами, поэтому буква
-  // может встречаться дважды (в группе "проблемы" и в группе "всё ок");
-  // указатель ведёт к первому вхождению.
-  const firstIdByLetter = new Map<string, string>();
-  for (const { child } of enrichedChildren) {
-    const letter = child.lastName[0]?.toUpperCase();
-    if (letter && !firstIdByLetter.has(letter)) {
-      firstIdByLetter.set(letter, child.id);
-    }
-  }
+  const listItems: ChildListItem[] = enrichedChildren.map(
+    ({ child, paymentOk, medicalOk, contractOk }) => ({
+      id: child.id,
+      lastName: child.lastName,
+      firstName: child.firstName,
+      groupName: child.group?.name ?? null,
+      phone: formatPhone(child.parentPhone),
+      balance: balances.get(child.id) ?? 0,
+      isDuplicate: duplicateChildIds.has(child.id),
+      isSick: child.status === "SICK",
+      hasNewReceipt: childrenWithNewReceipt.has(child.id),
+      paymentOk,
+      medicalOk,
+      contractOk,
+    }),
+  );
 
   return (
     <>
@@ -169,98 +154,7 @@ export default async function ChildrenPage({
         </Card>
       )}
 
-      <div className="mb-5 max-w-sm">
-        <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />
-      </div>
-
-      {children.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1">
-          {RUSSIAN_ALPHABET.map((letter) => {
-            const targetId = firstIdByLetter.get(letter);
-            return targetId ? (
-              <a
-                key={letter}
-                href={`#child-${targetId}`}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold text-brand-cyan transition hover:bg-white/10"
-              >
-                {letter}
-              </a>
-            ) : (
-              <span
-                key={letter}
-                className="flex h-7 w-7 items-center justify-center text-xs font-semibold text-brand-text/25"
-              >
-                {letter}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {children.length === 0 ? (
-        <EmptyState
-          title={q ? "Никого не нашлось" : "Пока нет ни одного ребёнка"}
-          description={
-            q
-              ? "Попробуйте изменить запрос."
-              : "Добавьте первого ученика, чтобы начать вести посещаемость и оплату."
-          }
-          action={
-            !q && (
-              <LinkButton href="/trainer/children/new">Добавить ребёнка</LinkButton>
-            )
-          }
-        />
-      ) : (
-        <Card>
-          <CardBody className="flex flex-col divide-y divide-white/10 p-0">
-            {enrichedChildren.map(({ child, paymentOk, medicalOk, contractOk }) => {
-              const balance = balances.get(child.id) ?? 0;
-              return (
-                <Link
-                  key={child.id}
-                  id={`child-${child.id}`}
-                  href={`/trainer/children/${child.id}`}
-                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {child.lastName} {child.firstName}
-                    </p>
-                    <p className="text-xs text-brand-text/50">
-                      {child.group?.name ?? "Без группы"} ·{" "}
-                      {formatPhone(child.parentPhone)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {duplicateChildIds.has(child.id) && (
-                      <Badge tone="amber">Возможный дубликат</Badge>
-                    )}
-                    {child.status === "SICK" && (
-                      <Badge tone="violet">болеет</Badge>
-                    )}
-                    {childrenWithNewReceipt.has(child.id) && (
-                      <Badge tone="violet">есть чек</Badge>
-                    )}
-                    {balance > 0 && (
-                      <Badge tone="amber">{balance} отраб.</Badge>
-                    )}
-                    <Badge tone={paymentOk ? "green" : "red"}>
-                      Оплата {paymentOk ? "✅" : "❌"}
-                    </Badge>
-                    <Badge tone={medicalOk ? "green" : "red"}>
-                      Справка {medicalOk ? "✅" : "❌"}
-                    </Badge>
-                    <Badge tone={contractOk ? "green" : "red"}>
-                      Договор {contractOk ? "✅" : "❌"}
-                    </Badge>
-                  </div>
-                </Link>
-              );
-            })}
-          </CardBody>
-        </Card>
-      )}
+      <ChildrenList items={listItems} />
     </>
   );
 }
