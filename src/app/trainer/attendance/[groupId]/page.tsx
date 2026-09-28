@@ -6,6 +6,7 @@ import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
 import { getPaymentStatus } from "@/lib/payment";
 import { saveAttendanceAction } from "@/lib/actions/attendance-actions";
 import { saveCourseResultsAction } from "@/lib/actions/course-actions";
+import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { COURSE_DISTANCES } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -50,7 +51,7 @@ export default async function AttendanceGroupPage({
     searchParamsResolved.conflicts ? searchParamsResolved.conflicts.split(",") : [],
   );
 
-  const [children, records] = await Promise.all([
+  const [children, records, courseResultsToday] = await Promise.all([
     prisma.child.findMany({
       where: { groupId },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -60,8 +61,13 @@ export default async function AttendanceGroupPage({
       where: { groupId, date },
       include: { child: true, markedByTrainer: { select: { username: true, displayName: true } } },
     }),
+    prisma.competitionResult.findMany({
+      where: { date, competitionName: COURSE_RESULT_NAME },
+      select: { childId: true },
+    }),
   ]);
   const recordByChildId = new Map(records.map((r) => [r.childId, r]));
+  const childIdsWithCourseResultToday = new Set(courseResultsToday.map((r) => r.childId));
   const homeChildIds = new Set(children.map((c) => c.id));
   // Дети из других групп, пришедшие на это занятие отработать/доп. занятием — добавлены через /trainer/workoffs
   const workoffVisitors = records.filter(
@@ -235,6 +241,7 @@ export default async function AttendanceGroupPage({
                       <AttendanceStatusPicker
                         name={`status-${child.id}`}
                         defaultValue={record?.status}
+                        hasCourseResult={childIdsWithCourseResultToday.has(child.id)}
                       />
                     )}
                   </div>

@@ -24,9 +24,11 @@ function revalidateAttendancePaths(groupId: string) {
 
 /**
  * Сохраняет посещаемость для набора детей на одном занятии (дата+группа) —
- * основной экран "Посещаемость". Дети без выбранного статуса (тренер ещё не
- * отметил) пропускаются — никакая запись для них не создаётся и не трогается,
- * а не подставляется "Пришёл" по умолчанию.
+ * основной экран "Посещаемость". Статус-пикер всегда шлёт значение (валидный
+ * статус либо "" при повторном клике на уже выбранный — снятие отметки).
+ * Пустое значение при отсутствующей записи — no-op (ребёнка никогда не
+ * отмечали); пустое значение при существующей записи — запись УДАЛЯЕТСЯ (а не
+ * подставляется "Не пришёл"), это и есть "снятие отметки".
  * workoffClosesGroupId (когда статус WORKOFF) всегда берётся из текущей домашней
  * группы ребёнка на сервере, а не от клиента.
  */
@@ -42,26 +44,39 @@ export async function saveAttendanceAction(formData: FormData) {
   }
   const date = parseDateInputValue(dateStr);
 
-  const markedChildIds = childIds.filter((childId) =>
-    VALID_STATUSES.includes(String(formData.get(`status-${childId}`) ?? "") as AttendanceStatus),
+  const statusByChild = new Map(
+    childIds.map((childId) => [childId, String(formData.get(`status-${childId}`) ?? "")]),
   );
-  if (markedChildIds.length === 0) {
-    return;
-  }
+  const markedChildIds = childIds.filter((id) =>
+    VALID_STATUSES.includes(statusByChild.get(id) as AttendanceStatus),
+  );
+  const clearCandidateIds = childIds.filter(
+    (id) => !VALID_STATUSES.includes(statusByChild.get(id) as AttendanceStatus),
+  );
 
-  const [group, children] = await Promise.all([
+  const [group, children, existingForClear] = await Promise.all([
     prisma.group.findUnique({ where: { id: groupId }, select: { splitByAssignedTrainer: true } }),
     prisma.child.findMany({
       where: { id: { in: markedChildIds } },
       select: { id: true, groupId: true },
     }),
+    clearCandidateIds.length > 0
+      ? prisma.attendanceRecord.findMany({
+          where: { groupId, date, childId: { in: clearCandidateIds } },
+          select: { id: true, childId: true, markedByTrainerId: true },
+        })
+      : Promise.resolve([]),
   ]);
   const homeGroupById = new Map(children.map((c) => [c.id, c.groupId]));
 
+  if (markedChildIds.length === 0 && existingForClear.length === 0) {
+    return;
+  }
+
   if (!group?.splitByAssignedTrainer) {
-    await prisma.$transaction(
-      markedChildIds.map((childId) => {
-        const status = String(formData.get(`status-${childId}`)) as AttendanceStatus;
+    await prisma.$transaction([
+      ...markedChildIds.map((childId) => {
+        const status = statusByChild.get(childId) as AttendanceStatus;
         const workoffClosesGroupId =
           status === "WORKOFF" ? (homeGroupById.get(childId) ?? groupId) : null;
 
@@ -78,7 +93,14 @@ export async function saveAttendanceAction(formData: FormData) {
           update: { status, workoffClosesGroupId, markedByTrainerId: trainer.id },
         });
       }),
-    );
+      ...(existingForClear.length > 0
+        ? [
+            prisma.attendanceRecord.deleteMany({
+              where: { id: { in: existingForClear.map((r) => r.id) } },
+            }),
+          ]
+        : []),
+    ]);
     revalidateAttendancePaths(groupId);
     return;
   }
@@ -92,15 +114,18 @@ export async function saveAttendanceAction(formData: FormData) {
   // защищённый уникальным индексом (childId, groupId, date) на уровне БД: если
   // второй тренер успел создать запись на долю секунды раньше, create падает
   // с P2002, и мы корректно считаем это конфликтом, а не перезаписываем чужое.
-  const existing = await prisma.attendanceRecord.findMany({
+  // Снятие отметки (clear) в совместной группе освобождает ребёнка: запись
+  // удаляется, и на следующем сохранении его снова может "забрать" любой
+  // тренер — чужие записи снятием не трогаем, это тоже конфликт.
+  const existingForMark = await prisma.attendanceRecord.findMany({
     where: { groupId, date, childId: { in: markedChildIds } },
     select: { childId: true, markedByTrainerId: true },
   });
-  const ownerByChild = new Map(existing.map((r) => [r.childId, r.markedByTrainerId]));
+  const ownerByChild = new Map(existingForMark.map((r) => [r.childId, r.markedByTrainerId]));
   const conflictChildIds: string[] = [];
 
   for (const childId of markedChildIds) {
-    const status = String(formData.get(`status-${childId}`)) as AttendanceStatus;
+    const status = statusByChild.get(childId) as AttendanceStatus;
     const workoffClosesGroupId =
       status === "WORKOFF" ? (homeGroupById.get(childId) ?? groupId) : null;
     const owner = ownerByChild.get(childId);
@@ -136,6 +161,18 @@ export async function saveAttendanceAction(formData: FormData) {
       }
     }
   }
+
+  const clearableIds = existingForClear
+    .filter((r) => r.markedByTrainerId === trainer.id)
+    .map((r) => r.id);
+  const foreignClearChildIds = existingForClear
+    .filter((r) => r.markedByTrainerId !== trainer.id)
+    .map((r) => r.childId);
+
+  if (clearableIds.length > 0) {
+    await prisma.attendanceRecord.deleteMany({ where: { id: { in: clearableIds } } });
+  }
+  conflictChildIds.push(...foreignClearChildIds);
 
   revalidateAttendancePaths(groupId);
 
