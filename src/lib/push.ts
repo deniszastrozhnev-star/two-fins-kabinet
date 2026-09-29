@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { formatDateRu } from "@/lib/dates";
 
 type PushPayload = { title: string; body: string; url?: string };
 
@@ -28,12 +29,13 @@ async function getWebPush() {
   return webpush;
 }
 
-/** Рассылает push всем подписанным родителям. Тихо no-op, если пуши не настроены. */
-export async function broadcastPush(payload: PushPayload): Promise<void> {
-  const webpush = await getWebPush();
-  if (!webpush) return;
+type WebPushClient = NonNullable<Awaited<ReturnType<typeof getWebPush>>>;
 
-  const subs = await prisma.pushSubscription.findMany();
+async function sendToSubscriptions(
+  webpush: WebPushClient,
+  subs: { id: string; endpoint: string; p256dh: string; auth: string }[],
+  payload: PushPayload,
+): Promise<void> {
   const staleIds: string[] = [];
 
   await Promise.all(
@@ -62,4 +64,32 @@ export async function broadcastPush(payload: PushPayload): Promise<void> {
   if (staleIds.length > 0) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: staleIds } } }).catch(() => {});
   }
+}
+
+/** Рассылает push всем подписанным родителям. Тихо no-op, если пуши не настроены. */
+export async function broadcastPush(payload: PushPayload): Promise<void> {
+  const webpush = await getWebPush();
+  if (!webpush) return;
+  const subs = await prisma.pushSubscription.findMany();
+  await sendToSubscriptions(webpush, subs, payload);
+}
+
+/** Push только подпискам одного ребёнка (у родителя может быть несколько
+ * устройств — шлём на все). Тихо no-op, если пуши не настроены или подписок нет. */
+export async function sendPushToChild(childId: string, payload: PushPayload): Promise<void> {
+  const webpush = await getWebPush();
+  if (!webpush) return;
+  const subs = await prisma.pushSubscription.findMany({ where: { childId } });
+  if (subs.length === 0) return;
+  await sendToSubscriptions(webpush, subs, payload);
+}
+
+/** "Оплата принята" — общий текст для всех мест, где тренер отмечает оплату
+ * (кнопка "Оплачено", подтверждение чека по тарифу, ручное указание даты). */
+export async function sendPaymentAcceptedPush(childId: string, paidUntil: Date): Promise<void> {
+  await sendPushToChild(childId, {
+    title: "Оплата принята",
+    body: `Оплата подтверждена, занятия оплачены до ${formatDateRu(paidUntil)}.`,
+    url: "/parent",
+  });
 }

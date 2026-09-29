@@ -8,6 +8,7 @@ import { requireTrainer } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
 import { parseDateInputValue } from "@/lib/dates";
 import { assignOrWaitlist } from "@/lib/waitlist";
+import { sendPaymentAcceptedPush } from "@/lib/push";
 
 function readChildFields(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
@@ -75,13 +76,19 @@ export async function markPaidAction(formData: FormData) {
   await requireTrainer();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Не найден ребёнок");
+  const paidUntil = endOfMonth(new Date());
   await prisma.child.update({
     where: { id },
-    data: { paidUntil: endOfMonth(new Date()) },
+    data: { paidUntil },
   });
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${id}`);
   revalidatePath("/parent", "layout");
+
+  // Не блокируем отметку оплаты, если push не настроен или упал.
+  await sendPaymentAcceptedPush(id, paidUntil).catch((err) =>
+    console.error("markPaidAction: push failed", err),
+  );
 }
 
 export async function deleteChildAction(formData: FormData) {
