@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { get } from "@vercel/blob";
+import { get } from "@/lib/storage";
 import { getSession } from "@/lib/auth";
 
 /** Отдаёт бланк абонентского договора (приватный blob, ссылка — в CONTRACT_TEMPLATE_URL)

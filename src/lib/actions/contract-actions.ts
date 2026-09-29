@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { put, get, del } from "@vercel/blob";
+import { put, get, del } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild } from "@/lib/auth";
 import { buildContractPdf } from "@/lib/contractPdf";

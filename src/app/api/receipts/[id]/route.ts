@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { get } from "@vercel/blob";
+import { get } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 
@@ -24,7 +24,7 @@ export async function GET(
   return new NextResponse(result.stream, {
     headers: {
       "Content-Type": result.blob.contentType ?? "application/octet-stream",
-      "Content-Disposition": `inline; filename="${result.blob.pathname.split("/").pop()}"`,
+      "Content-Disposition": `inline; filename="${receipt.fileUrl.split("/").pop()}"`,
     },
   });
 }

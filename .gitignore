@@ -42,6 +42,3 @@ next-env.d.ts
 
 .vercel
 .env*
-
-# tesseract.js языковые данные (кэш, скачивается по требованию)
-*.traineddata

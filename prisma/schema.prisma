@@ -95,6 +95,7 @@ model Child {
   extraSessionEntitlements ExtraSessionEntitlement[]
   linkedAthlete            Athlete?
   pushSubscriptions        PushSubscription[]
+  paymentRemindersSent     PaymentReminderSent[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -522,6 +523,30 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
 
+  @@index([childId])
+}
+
+enum PaymentReminderKind {
+  BEFORE_3D // за 3 дня до окончания
+  DUE_TODAY // в день окончания
+  OVERDUE_3D // через 3 дня после просрочки
+}
+
+// Журнал отправленных напоминаний об оплате — защита от дублей: уникальность
+// по (childId, kind, paidUntil) означает "это конкретное напоминание для этого
+// конкретного значения paidUntil уже отправлено", а не просто "сегодня уже
+// слали". Если тренер поменяет paidUntil (родитель оплатил), старая запись
+// становится просто историей, а для нового значения paidUntil напоминания
+// смогут сработать заново на общих основаниях.
+model PaymentReminderSent {
+  id        String              @id @default(cuid())
+  childId   String
+  child     Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  kind      PaymentReminderKind
+  paidUntil DateTime
+  sentAt    DateTime            @default(now())
+
+  @@unique([childId, kind, paidUntil])
   @@index([childId])
 }
 

@@ -17,18 +17,14 @@ import {
   addCompetitionResultAction,
   deleteCompetitionResultAction,
 } from "@/lib/actions/competition-actions";
-import {
-  addExtraSessionEntitlementAction,
-  deleteExtraSessionEntitlementAction,
-} from "@/lib/actions/extra-session-actions";
-import { getKnownTariffs } from "@/lib/tariffs";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input, FieldGroup, Select } from "@/components/ui/Field";
+import { Input, FieldGroup } from "@/components/ui/Field";
 import { ChildForm } from "@/components/trainer/ChildForm";
+import { ChildGroupForm } from "@/components/trainer/ChildGroupForm";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ReceiptTariffPrompt } from "@/components/trainer/ReceiptTariffPrompt";
@@ -54,12 +50,19 @@ export default async function ChildDetailPage({
     certificates,
     contracts,
     results,
-    tariffs,
     extraSessions,
   ] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        pool: true,
+        time: true,
+        pricePerMonth: true,
+        daysOfWeek: true,
+      },
     }),
     getWorkoffBalance(id),
     prisma.attendanceRecord.findMany({
@@ -87,7 +90,6 @@ export default async function ChildDetailPage({
       where: { childId: id },
       orderBy: { date: "desc" },
     }),
-    getKnownTariffs(),
     prisma.extraSessionEntitlement.findMany({
       where: { childId: id },
       include: { group: true },
@@ -132,6 +134,7 @@ export default async function ChildDetailPage({
             <ChildForm
               action={updateChildAction}
               groups={groups}
+              hideGroupField
               initial={{
                 id: child.id,
                 lastName: child.lastName,
@@ -178,60 +181,13 @@ export default async function ChildDetailPage({
 
           <Card>
             <CardBody>
-              <h2 className="mb-3 font-heading text-lg font-bold">Доп. занятие</h2>
-              <form
-                action={addExtraSessionEntitlementAction}
-                className="mb-4 flex flex-col gap-3 border-b border-white/10 pb-4"
-              >
-                <input type="hidden" name="childId" value={child.id} />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FieldGroup label="Группа" htmlFor="extraGroupId">
-                    <Select id="extraGroupId" name="groupId" defaultValue="">
-                      <option value="" disabled>
-                        Выберите группу…
-                      </option>
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </FieldGroup>
-                  <FieldGroup label="Занятий в неделю" htmlFor="sessionsPerWeek">
-                    <Input
-                      id="sessionsPerWeek"
-                      name="sessionsPerWeek"
-                      type="number"
-                      min={1}
-                      defaultValue={1}
-                      required
-                    />
-                  </FieldGroup>
-                </div>
-                <div className="flex justify-end">
-                  <SaveButton>Добавить</SaveButton>
-                </div>
-              </form>
-              {extraSessions.length === 0 ? (
-                <p className="text-sm text-brand-text/50">Доп. занятий не назначено.</p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-white/10">
-                  {extraSessions.map((e) => (
-                    <li key={e.id} className="flex items-center justify-between gap-3 py-2">
-                      <p className="text-sm">
-                        {e.group.name} · {e.sessionsPerWeek}×/нед
-                      </p>
-                      <form action={deleteExtraSessionEntitlementAction}>
-                        <input type="hidden" name="id" value={e.id} />
-                        <input type="hidden" name="childId" value={child.id} />
-                        <ConfirmSubmitButton confirmMessage="Убрать доп. занятие?">
-                          Удалить
-                        </ConfirmSubmitButton>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <h2 className="mb-3 font-heading text-lg font-bold">Группа и доп. занятие</h2>
+              <ChildGroupForm
+                childId={child.id}
+                groups={groups}
+                currentGroupId={child.groupId}
+                currentExtraGroupId={extraSessions[0]?.groupId ?? null}
+              />
             </CardBody>
           </Card>
 
@@ -244,10 +200,6 @@ export default async function ChildDetailPage({
                 <ul className="flex flex-col divide-y divide-white/10">
                   {receipts.map((r) => {
                     const isImage = r.contentType?.startsWith("image/");
-                    const tariffMatch =
-                      r.recognizedAmount != null
-                        ? tariffs.find((t) => t.amount === r.recognizedAmount)
-                        : undefined;
                     return (
                       <li key={r.id} className="flex flex-col gap-2 py-2">
                         <div className="flex items-center gap-3">
@@ -282,16 +234,9 @@ export default async function ChildDetailPage({
                             {isImage ? "Открыть →" : "Открыть PDF →"}
                           </a>
                         </div>
-                        {r.recognizedAmount != null &&
-                          !r.resolvedAt &&
-                          tariffMatch && (
-                            <ReceiptTariffPrompt
-                              receiptId={r.id}
-                              childId={child.id}
-                              recognizedAmount={r.recognizedAmount}
-                              tariffLabel={tariffMatch.label}
-                            />
-                          )}
+                        {!r.resolvedAt && (
+                          <ReceiptTariffPrompt receiptId={r.id} childId={child.id} />
+                        )}
                       </li>
                     );
                   })}

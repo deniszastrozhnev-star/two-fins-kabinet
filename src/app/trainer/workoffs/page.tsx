@@ -6,11 +6,9 @@ import { saveWorkoffAttendanceAction } from "@/lib/actions/workoff-actions";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GroupDateFilter } from "@/components/trainer/GroupDateFilter";
-import { SearchBox } from "@/components/trainer/SearchBox";
-import { AttendedToggle } from "@/components/trainer/AttendedToggle";
+import { WorkoffChildList, type WorkoffChildItem } from "@/components/trainer/WorkoffChildList";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import type { AttendanceStatus } from "@prisma/client";
 
@@ -20,7 +18,6 @@ export default async function WorkoffsPage({
   searchParams: Promise<{
     groupId?: string;
     date?: string;
-    q?: string;
     back?: string;
     status?: string;
   }>;
@@ -54,7 +51,6 @@ export default async function WorkoffsPage({
   const groupId = params.groupId ?? groups[0].id;
   const dateStr = params.date ?? toDateInputValue(new Date());
   const date = parseDateInputValue(dateStr);
-  const q = params.q ?? "";
   const selectedGroup = groups.find((g) => g.id === groupId);
   // У "Новичков" (малая чаша) отработки — только между собой, не со старшими группами
   const levelRestriction =
@@ -62,19 +58,7 @@ export default async function WorkoffsPage({
 
   const [children, existingRecords, entitlements] = await Promise.all([
     prisma.child.findMany({
-      where: {
-        AND: [
-          q
-            ? {
-                OR: [
-                  { lastName: { contains: q, mode: "insensitive" } },
-                  { firstName: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {},
-          levelRestriction ? { group: { level: levelRestriction } } : {},
-        ],
-      },
+      where: levelRestriction ? { group: { level: levelRestriction } } : {},
       include: { group: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
@@ -143,73 +127,33 @@ export default async function WorkoffsPage({
             groups={groups}
             groupId={groupId}
             date={dateStr}
-            extraHidden={{ q, back, status }}
+            extraHidden={{ back, status }}
           />
         </CardBody>
       </Card>
 
-      <div className="mb-5 max-w-sm">
-        <SearchBox
-          action="/trainer/workoffs"
-          defaultValue={q}
-          placeholder="Поиск ребёнка по имени…"
-          extraHidden={{ groupId, date: dateStr, back, status }}
-        />
-      </div>
-
       {children.length === 0 ? (
-        <EmptyState title="Никого не нашлось" description="Попробуйте изменить запрос." />
+        <EmptyState title="Никого нет в этой группе" description="Выберите другую группу." />
       ) : (
         <form action={saveWorkoffAttendanceAction}>
           <input type="hidden" name="groupId" value={groupId} />
           <input type="hidden" name="date" value={dateStr} />
           <input type="hidden" name="back" value={back} />
           <input type="hidden" name="status" value={status} />
-          <Card>
-            <CardBody className="flex flex-col divide-y divide-white/10 p-0">
-              {children.map((child) => {
-                const balance = balances.get(child.id) ?? 0;
-                const entitlement = entitlementByChildId.get(child.id);
-                return (
-                  <div
-                    key={child.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5"
-                  >
-                    <input type="hidden" name="childId" value={child.id} />
-                    <div>
-                      <p className="font-medium">
-                        {child.lastName} {child.firstName}
-                      </p>
-                      <p className="text-xs text-brand-text/50">
-                        {child.group?.name ?? "Без группы"}
-                        {!isExtra && balance > 0 && (
-                          <>
-                            {" · "}
-                            <Badge tone="amber" className="align-middle">
-                              {balance} отраб.
-                            </Badge>
-                          </>
-                        )}
-                        {isExtra && entitlement != null && (
-                          <>
-                            {" · "}
-                            <Badge tone="violet" className="align-middle">
-                              право: {entitlement}×/нед
-                            </Badge>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <AttendedToggle
-                      childId={child.id}
-                      defaultChecked={attendedIds.has(child.id)}
-                      label={isExtra ? "Пришёл на допзанятие" : "Пришёл на отработку"}
-                    />
-                  </div>
-                );
-              })}
-            </CardBody>
-          </Card>
+          <WorkoffChildList
+            items={children.map(
+              (child): WorkoffChildItem => ({
+                id: child.id,
+                lastName: child.lastName,
+                firstName: child.firstName,
+                groupName: child.group?.name ?? null,
+                balance: balances.get(child.id) ?? 0,
+                entitlement: entitlementByChildId.get(child.id) ?? null,
+                attended: attendedIds.has(child.id),
+              }),
+            )}
+            isExtra={isExtra}
+          />
           <div className="mt-4 flex justify-end">
             <SaveButton>{isExtra ? "Сохранить допзанятия" : "Сохранить отработки"}</SaveButton>
           </div>
