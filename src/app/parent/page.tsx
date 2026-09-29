@@ -1,10 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireParentFamily } from "@/lib/auth";
-import { getWorkoffBalance } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
-import { getActiveStoriesFeed } from "@/lib/stories";
-import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { formatDateRu } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -13,7 +10,6 @@ import { Badge } from "@/components/ui/Badge";
 import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
 import { ContractUpload } from "@/components/parent/ContractUpload";
-import { StoryRail } from "@/components/shared/StoryRail";
 import { FamilySummaryCard } from "@/components/parent/FamilySummaryCard";
 
 // Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
@@ -27,49 +23,42 @@ const SBP_LINK =
 
 export default async function ParentOverviewPage() {
   const { child, siblings } = await requireParentFamily();
-  const [balance, payment, latestCertificate, latestContract, results, storiesFeed, familyRows] =
-    await Promise.all([
-      getWorkoffBalance(child.id),
-      Promise.resolve(getPaymentStatus(child.paidUntil)),
-      prisma.medicalCertificate.findFirst({
-        where: { childId: child.id },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.contractDocument.findFirst({
-        where: { childId: child.id },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.competitionResult.findMany({
-        where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
-        orderBy: { date: "desc" },
-      }),
-      getActiveStoriesFeed({ role: "parent", id: child.id }),
-      siblings.length > 1
-        ? Promise.all(
-            siblings.map(async (s) => {
-              const [cert, contract] = await Promise.all([
-                prisma.medicalCertificate.findFirst({
-                  where: { childId: s.id },
-                  orderBy: { createdAt: "desc" },
-                  select: { validUntil: true },
-                }),
-                prisma.contractDocument.findFirst({
-                  where: { childId: s.id },
-                  select: { id: true },
-                }),
-              ]);
-              return {
-                id: s.id,
-                name: `${s.lastName} ${s.firstName}`,
-                isActive: s.id === child.id,
-                payment: getPaymentStatus(s.paidUntil),
-                medical: getMedicalStatus(cert?.validUntil ?? null),
-                contractUploaded: contract != null,
-              };
-            }),
-          )
-        : Promise.resolve([]),
-    ]);
+  const [payment, latestCertificate, latestContract, familyRows] = await Promise.all([
+    Promise.resolve(getPaymentStatus(child.paidUntil)),
+    prisma.medicalCertificate.findFirst({
+      where: { childId: child.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.contractDocument.findFirst({
+      where: { childId: child.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    siblings.length > 1
+      ? Promise.all(
+          siblings.map(async (s) => {
+            const [cert, contract] = await Promise.all([
+              prisma.medicalCertificate.findFirst({
+                where: { childId: s.id },
+                orderBy: { createdAt: "desc" },
+                select: { validUntil: true },
+              }),
+              prisma.contractDocument.findFirst({
+                where: { childId: s.id },
+                select: { id: true },
+              }),
+            ]);
+            return {
+              id: s.id,
+              name: `${s.lastName} ${s.firstName}`,
+              isActive: s.id === child.id,
+              payment: getPaymentStatus(s.paidUntil),
+              medical: getMedicalStatus(cert?.validUntil ?? null),
+              contractUploaded: contract != null,
+            };
+          }),
+        )
+      : Promise.resolve([]),
+  ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
 
   return (
@@ -101,17 +90,6 @@ export default async function ParentOverviewPage() {
         }
       />
 
-      <Card className="mb-6">
-        <CardBody>
-          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
-          <StoryRail
-            feed={storiesFeed}
-            ownName={`Родители ${child.lastName} ${child.firstName}`}
-            ownAvatarUrl={null}
-          />
-        </CardBody>
-      </Card>
-
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="scroll-mt-24" id="payment">
           <CardBody>
@@ -127,17 +105,22 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        <Card>
+        <Card className="scroll-mt-24" id="schedule">
           <CardBody>
-            <p className="text-sm text-brand-text/60">Доступные отработки</p>
-            <p className="mt-2 font-heading text-3xl font-bold text-brand-cyan">
-              {balance > 0 ? balance : 0}
-            </p>
-            <p className="mt-3 text-xs text-brand-text/50">
-              {balance > 0
-                ? "Посмотрите, куда прийти, на вкладке «Отработки»"
-                : "Пропущенных занятий, требующих отработки, нет"}
-            </p>
+            <p className="text-sm text-brand-text/60">Расписание</p>
+            {child.group ? (
+              <>
+                <p className="mt-2 font-heading text-xl font-bold">{child.group.name}</p>
+                <p className="mt-1 text-sm text-brand-text/70">
+                  {child.group.daysOfWeek.join(", ")} · {child.group.time}
+                </p>
+                <p className="mt-1 text-sm text-brand-text/50">{child.group.pool}</p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-brand-text/50">
+                Группа пока не назначена — уточните у тренера
+              </p>
+            )}
           </CardBody>
         </Card>
 
@@ -173,7 +156,7 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        <Card className="scroll-mt-24 sm:col-span-2" id="contract">
+        <Card className="scroll-mt-24 sm:col-span-2" id="documents">
           <CardBody>
             <p className="text-sm text-brand-text/60">Медицинские документы</p>
             <p className="mt-2 text-sm text-brand-text/70">
@@ -226,28 +209,6 @@ export default async function ParentOverviewPage() {
                 <ContractUpload />
               </div>
             </div>
-          </CardBody>
-        </Card>
-
-        <Card className="scroll-mt-24 sm:col-span-2" id="results">
-          <CardBody>
-            <p className="mb-2 text-sm text-brand-text/60">
-              Результаты соревнований
-            </p>
-            {results.length === 0 ? (
-              <p className="text-sm text-brand-text/50">Результатов пока нет</p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-white/10">
-                {results.map((r) => (
-                  <li key={r.id} className="py-2">
-                    <p className="text-sm font-medium">{r.competitionName}</p>
-                    <p className="text-xs text-brand-text/50">
-                      {formatDateRu(r.date)} · {r.result}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
           </CardBody>
         </Card>
       </div>

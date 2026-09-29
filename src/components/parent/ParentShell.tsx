@@ -4,20 +4,14 @@ import { Button } from "@/components/ui/Button";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import type { NavCardItem } from "@/components/shared/NavCard";
-import {
-  PaymentIcon,
-  RegisterIcon,
-  MedicalIcon,
-  WorkoffIcon,
-  TrophyIcon,
-  MetricsIcon,
-  NewsIcon,
-  CalendarIcon,
-  TrainerIcon,
-} from "@/components/icons";
+import { PaymentIcon, RegisterIcon, AttendanceIcon, MoreIcon } from "@/components/icons";
 import type { PaymentStatus } from "@/lib/payment";
 import type { MedicalStatus } from "@/lib/medical";
 
+/** Упрощённый первый экран: на виду только оплата, документы (справка+договор
+ * одним пунктом) и расписание — всё остальное (отработки, результаты,
+ * курсовка, новости, календарь посещений, тренеры) убрано в "Ещё", без
+ * потери функций — см. /parent/more. */
 export function ParentShell({
   children,
   childName,
@@ -26,9 +20,6 @@ export function ParentShell({
   contractUploaded,
   payment,
   medical,
-  workoffBalance,
-  resultsCount,
-  courseResultsCount,
 }: {
   children: React.ReactNode;
   childName: string;
@@ -37,11 +28,16 @@ export function ParentShell({
   contractUploaded: boolean;
   payment: PaymentStatus;
   medical: MedicalStatus;
-  workoffBalance: number;
-  resultsCount: number;
-  courseResultsCount: number;
 }) {
   const iconClass = "h-6 w-6";
+
+  // "Документы" объединяет справку и договор одной отметкой — красная, если
+  // хоть чего-то не хватает, чтобы сразу было видно, что нужно донести.
+  const documentsOk = contractUploaded && medical.tone === "green";
+  const documentsBadge = documentsOk
+    ? { label: "В порядке", tone: "green" as const }
+    : { label: "Нужно внимание", tone: "red" as const };
+
   const items: NavCardItem[] = [
     {
       href: "/parent#payment",
@@ -50,40 +46,21 @@ export function ParentShell({
       badge: { label: payment.label, tone: payment.tone },
     },
     {
-      href: "/parent#contract",
-      label: "Договор",
+      href: "/parent#documents",
+      label: "Документы",
       icon: <RegisterIcon className={iconClass} />,
-      badge: contractUploaded
-        ? { label: "Загружен", tone: "green" }
-        : { label: "Не загружен", tone: "red" },
+      badge: documentsBadge,
     },
     {
-      href: "/parent#contract",
-      label: "Справка",
-      icon: <MedicalIcon className={iconClass} />,
-      badge: { label: medical.label, tone: medical.tone },
+      href: "/parent#schedule",
+      label: "Расписание",
+      icon: <AttendanceIcon className={iconClass} />,
     },
     {
-      href: "/parent/workoff-schedule",
-      label: "Отработки",
-      icon: <WorkoffIcon className={iconClass} />,
-      badge: { label: workoffBalance > 0 ? `${workoffBalance} доступно` : "Нет", tone: "neutral" },
+      href: "/parent/more",
+      label: "Ещё",
+      icon: <MoreIcon className={iconClass} />,
     },
-    {
-      href: "/parent#results",
-      label: "Результаты",
-      icon: <TrophyIcon className={iconClass} />,
-      badge: { label: resultsCount > 0 ? `${resultsCount}` : "Нет", tone: "neutral" },
-    },
-    {
-      href: "/parent/course-results",
-      label: "Курсовка",
-      icon: <MetricsIcon className={iconClass} />,
-      badge: { label: courseResultsCount > 0 ? `${courseResultsCount}` : "Нет", tone: "neutral" },
-    },
-    { href: "/parent/events", label: "Новости", icon: <NewsIcon className={iconClass} /> },
-    { href: "/parent/calendar", label: "Календарь", icon: <CalendarIcon className={iconClass} /> },
-    { href: "/parent/trainers", label: "Наши тренеры", icon: <TrainerIcon className={iconClass} /> },
   ];
 
   return (

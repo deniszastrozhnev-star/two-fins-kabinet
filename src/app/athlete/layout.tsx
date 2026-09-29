@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireAthlete } from "@/lib/auth";
 import { getAthleteLeaderboard } from "@/lib/athletes";
 import { getSuggestedRankForAthlete } from "@/lib/rankStandards";
-import { getActiveStoriesFeed } from "@/lib/stories";
 import { AthleteShell } from "@/components/athlete/AthleteShell";
 
 export default async function AthleteLayout({
@@ -12,13 +11,12 @@ export default async function AthleteLayout({
 }) {
   const athlete = await requireAthlete();
 
-  const [athleteExtra, weekBoard, storiesFeed] = await Promise.all([
+  const [athleteExtra, weekBoard] = await Promise.all([
     prisma.athlete.findUnique({
       where: { id: athlete.id },
       select: { rank: true, gender: true, avatarUrl: true },
     }),
     getAthleteLeaderboard("week"),
-    getActiveStoriesFeed({ role: "athlete", id: athlete.id }),
   ]);
 
   const rank = athleteExtra?.rank ?? null;
@@ -41,7 +39,6 @@ export default async function AthleteLayout({
       weekGymMinutes={weekRow?.gymMinutes ?? 0}
       weekPlace={weekIndex >= 0 ? weekIndex + 1 : null}
       weekTotal={weekBoard.length}
-      storiesFeed={storiesFeed}
     >
       {children}
     </AthleteShell>

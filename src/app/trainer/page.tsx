@@ -2,21 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { formatDateRu } from "@/lib/dates";
-import { getActiveStoriesFeed } from "@/lib/stories";
 import { getTodaysBirthdays } from "@/lib/birthdays";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TrainerAvatarUpload } from "@/components/trainer/TrainerAvatarUpload";
 import { TrainerProfileForm } from "@/components/trainer/TrainerProfileForm";
-import { StoryRail } from "@/components/shared/StoryRail";
 
 export default async function TrainerDashboardPage() {
   const trainer = await requireTrainer();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [upcomingEvents, myGroups, storiesFeed, birthdays] = await Promise.all([
+  const [upcomingEvents, myGroups, birthdays] = await Promise.all([
     prisma.event.findMany({
       where: { dateStart: { gte: today } },
       orderBy: { dateStart: "asc" },
@@ -26,7 +24,6 @@ export default async function TrainerDashboardPage() {
       where: { trainers: { some: { id: trainer.id } } },
       orderBy: { name: "asc" },
     }),
-    getActiveStoriesFeed({ role: "trainer", id: trainer.id }),
     getTodaysBirthdays(),
   ]);
   const avatarUrl = trainer.avatarUrl ? `/api/trainer-avatars/${trainer.id}` : null;
@@ -85,19 +82,6 @@ export default async function TrainerDashboardPage() {
           </CardBody>
         </Card>
       </div>
-
-      <Card className="mb-8">
-        <CardBody>
-          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
-          <StoryRail
-            feed={storiesFeed}
-            ownName={displayName}
-            ownAvatarUrl={avatarUrl}
-            canModerate
-            canPost
-          />
-        </CardBody>
-      </Card>
 
       <h2 className="mb-3 font-heading text-lg font-bold">Ближайшие события</h2>
       {upcomingEvents.length === 0 ? (
