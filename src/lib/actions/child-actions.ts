@@ -12,7 +12,14 @@ import { assignOrWaitlist } from "@/lib/waitlist";
 function readChildFields(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
   const firstName = String(formData.get("firstName") ?? "").trim();
-  const groupId = String(formData.get("groupId") ?? "") || null;
+  // На карточке ребёнка поле группы скрыто (группа и доп. занятие
+  // редактируются отдельным конструктором) — formData.has различает "поля
+  // нет в форме вовсе, группу не трогаем" от "поле есть, но пусто = снять
+  // группу", иначе каждое сохранение прочих полей на карточке случайно
+  // снимало бы ребёнка с группы.
+  const groupId = formData.has("groupId")
+    ? String(formData.get("groupId") ?? "") || null
+    : undefined;
   const parentPhone = normalizePhone(String(formData.get("parentPhone") ?? ""));
   const paidUntilRaw = String(formData.get("paidUntil") ?? "");
   const paidUntil = paidUntilRaw ? parseDateInputValue(paidUntilRaw) : null;
@@ -48,7 +55,7 @@ export async function updateChildAction(formData: FormData) {
   });
   const { groupId: requestedGroupId, ...data } = readChildFields(formData);
 
-  if (requestedGroupId !== (existing?.groupId ?? null)) {
+  if (requestedGroupId !== undefined && requestedGroupId !== (existing?.groupId ?? null)) {
     await prisma.child.update({ where: { id }, data: { ...data, groupId: null } });
     if (requestedGroupId) {
       await assignOrWaitlist(id, requestedGroupId);

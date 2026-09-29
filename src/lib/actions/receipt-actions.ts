@@ -6,8 +6,6 @@ import { put } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild, requireTrainer } from "@/lib/auth";
 import { resizeForUpload } from "@/lib/image";
-import { recognizeTextSafe } from "@/lib/ocr";
-import { extractAmountCandidates, matchTariff, getKnownTariffs } from "@/lib/tariffs";
 import { parseDateInputValue } from "@/lib/dates";
 
 export type ActionState = { error?: string; success?: string } | undefined;
@@ -45,25 +43,9 @@ export async function uploadReceiptAction(
 
   const blob = await put(key, buffer, { access: "private", contentType });
 
-  const receipt = await prisma.paymentReceipt.create({
+  await prisma.paymentReceipt.create({
     data: { childId: child.id, fileUrl: blob.url, contentType },
   });
-
-  // Распознавание — лучшее из возможного; чек уже сохранён и не зависит от результата.
-  if (contentType.startsWith("image/")) {
-    const text = await recognizeTextSafe(buffer);
-    if (text) {
-      const candidates = extractAmountCandidates(text);
-      const tariffs = await getKnownTariffs();
-      const match = matchTariff(candidates, tariffs);
-      if (match) {
-        await prisma.paymentReceipt.update({
-          where: { id: receipt.id },
-          data: { recognizedAmount: match.amount },
-        });
-      }
-    }
-  }
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${child.id}`);

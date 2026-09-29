@@ -9,6 +9,7 @@ export function ChildForm({
   groups,
   initial,
   submitLabel = "Сохранить",
+  hideGroupField = false,
 }: {
   action: (formData: FormData) => void;
   groups: { id: string; name: string }[];
@@ -22,6 +23,9 @@ export function ChildForm({
     birthDate?: Date | null;
   };
   submitLabel?: string;
+  /** На карточке ребёнка группа и доп. занятие редактируются отдельным
+   * конструктором (ChildGroupForm) — здесь поле не нужно и не дублируется. */
+  hideGroupField?: boolean;
 }) {
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -45,16 +49,18 @@ export function ChildForm({
         </FieldGroup>
       </div>
 
-      <FieldGroup label="Группа" htmlFor="groupId">
-        <Select id="groupId" name="groupId" defaultValue={initial?.groupId ?? ""}>
-          <option value="">Без группы</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </Select>
-      </FieldGroup>
+      {!hideGroupField && (
+        <FieldGroup label="Группа" htmlFor="groupId">
+          <Select id="groupId" name="groupId" defaultValue={initial?.groupId ?? ""}>
+            <option value="">Без группы</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        </FieldGroup>
+      )}
 
       <FieldGroup
         label="Телефон родителя"

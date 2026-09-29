@@ -14,22 +14,15 @@ import { endOfMonth } from "date-fns";
 export function ReceiptTariffPrompt({
   receiptId,
   childId,
-  recognizedAmount,
-  tariffLabel,
 }: {
   receiptId: string;
   childId: string;
-  recognizedAmount: number;
-  tariffLabel: string;
 }) {
   const [manual, setManual] = useState(false);
   const endOfThisMonth = endOfMonth(new Date());
 
   return (
     <div className="mt-2 rounded-lg border border-brand-cyan/30 bg-brand-cyan/10 p-3">
-      <p className="text-sm text-brand-text/80">
-        Распознано: <span className="font-semibold text-brand-cyan">{recognizedAmount.toLocaleString("ru-RU")}₽</span> — похоже на {tariffLabel}
-      </p>
       {!manual ? (
         <div className="mt-2 flex flex-wrap gap-2">
           <form action={confirmReceiptTariffAction}>
