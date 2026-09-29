@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireParentChild } from "@/lib/auth";
+import { requireParentFamily } from "@/lib/auth";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { getWorkoffBalance } from "@/lib/workoffs";
@@ -11,7 +11,7 @@ export default async function ParentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const child = await requireParentChild();
+  const { child, siblings } = await requireParentFamily();
   const [contract, latestCertificate, workoffBalance, resultsCount, courseResultsCount] =
     await Promise.all([
       prisma.contractDocument.findFirst({
@@ -38,6 +38,8 @@ export default async function ParentLayout({
   return (
     <ParentShell
       childName={`${child.lastName} ${child.firstName}`}
+      childId={child.id}
+      siblings={siblings}
       contractUploaded={contractUploaded}
       payment={payment}
       medical={medical}

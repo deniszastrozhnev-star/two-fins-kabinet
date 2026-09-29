@@ -70,7 +70,7 @@ export async function confirmReceiptTariffAction(formData: FormData) {
   if (!receiptId || !childId) throw new Error("Не найден чек");
 
   const paidUntil = endOfMonth(new Date());
-  await prisma.$transaction([
+  const [updated] = await prisma.$transaction([
     prisma.child.update({
       where: { id: childId },
       data: { paidUntil },
@@ -85,7 +85,7 @@ export async function confirmReceiptTariffAction(formData: FormData) {
   revalidatePath(`/trainer/children/${childId}`);
   revalidatePath("/parent", "layout");
 
-  await sendPaymentAcceptedPush(childId, paidUntil).catch((err) =>
+  await sendPaymentAcceptedPush(updated, paidUntil).catch((err) =>
     console.error("confirmReceiptTariffAction: push failed", err),
   );
 }
@@ -101,7 +101,7 @@ export async function manualReceiptResolutionAction(formData: FormData) {
   }
 
   const paidUntil = parseDateInputValue(dateStr);
-  await prisma.$transaction([
+  const [updated] = await prisma.$transaction([
     prisma.child.update({
       where: { id: childId },
       data: { paidUntil },
@@ -116,7 +116,7 @@ export async function manualReceiptResolutionAction(formData: FormData) {
   revalidatePath(`/trainer/children/${childId}`);
   revalidatePath("/parent", "layout");
 
-  await sendPaymentAcceptedPush(childId, paidUntil).catch((err) =>
+  await sendPaymentAcceptedPush(updated, paidUntil).catch((err) =>
     console.error("manualReceiptResolutionAction: push failed", err),
   );
 }

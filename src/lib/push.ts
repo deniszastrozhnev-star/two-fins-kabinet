@@ -74,22 +74,29 @@ export async function broadcastPush(payload: PushPayload): Promise<void> {
   await sendToSubscriptions(webpush, subs, payload);
 }
 
-/** Push только подпискам одного ребёнка (у родителя может быть несколько
- * устройств — шлём на все). Тихо no-op, если пуши не настроены или подписок нет. */
-export async function sendPushToChild(childId: string, payload: PushPayload): Promise<void> {
+/** Push подпискам одной семьи (по телефону — см. схему PushSubscription: у
+ * родителя может быть несколько детей и несколько устройств, подписка
+ * привязана к семье целиком, а не к конкретному ребёнку). Тихо no-op, если
+ * пуши не настроены или подписок нет. */
+export async function sendPushToFamily(parentPhone: string, payload: PushPayload): Promise<void> {
   const webpush = await getWebPush();
   if (!webpush) return;
-  const subs = await prisma.pushSubscription.findMany({ where: { childId } });
+  const subs = await prisma.pushSubscription.findMany({ where: { parentPhone } });
   if (subs.length === 0) return;
   await sendToSubscriptions(webpush, subs, payload);
 }
 
 /** "Оплата принята" — общий текст для всех мест, где тренер отмечает оплату
- * (кнопка "Оплачено", подтверждение чека по тарифу, ручное указание даты). */
-export async function sendPaymentAcceptedPush(childId: string, paidUntil: Date): Promise<void> {
-  await sendPushToChild(childId, {
+ * (кнопка "Оплачено", подтверждение чека по тарифу, ручное указание даты).
+ * Имя ребёнка — обязательно в тексте: семья может состоять из нескольких
+ * детей, и push должен явно указывать, о ком речь. */
+export async function sendPaymentAcceptedPush(
+  child: { firstName: string; lastName: string; parentPhone: string },
+  paidUntil: Date,
+): Promise<void> {
+  await sendPushToFamily(child.parentPhone, {
     title: "Оплата принята",
-    body: `Оплата подтверждена, занятия оплачены до ${formatDateRu(paidUntil)}.`,
+    body: `${child.lastName} ${child.firstName}: оплата подтверждена, занятия оплачены до ${formatDateRu(paidUntil)}.`,
     url: "/parent",
   });
 }

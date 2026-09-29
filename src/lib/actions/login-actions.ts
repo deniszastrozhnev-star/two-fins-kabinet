@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
-import { setSessionCookie } from "@/lib/auth";
+import { setSessionCookie, getSession } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
 import { parseDateInputValue } from "@/lib/dates";
 
@@ -62,7 +62,28 @@ export async function parentLoginAction(
     };
   }
 
-  await setSessionCookie({ role: "parent", childId: child.id });
+  await setSessionCookie({ role: "parent", childId: child.id, phone });
+  redirect("/parent");
+}
+
+/** Переключение между детьми одного родителя (переключатель в шапке кабинета) —
+ * тот же телефон, что и в текущей сессии, просто переподписывается на другого
+ * ребёнка; проверяем, что целевой ребёнок действительно принадлежит той же
+ * семье (по телефону), а не берём id со слов клиента как есть. */
+export async function switchActiveChildAction(formData: FormData) {
+  const session = await getSession();
+  if (!session || session.role !== "parent") {
+    redirect("/parent-login");
+  }
+  const targetChildId = String(formData.get("childId") ?? "");
+  const target = await prisma.child.findFirst({
+    where: { id: targetChildId, parentPhone: session.phone },
+    select: { id: true },
+  });
+  if (!target) {
+    throw new Error("Этот ребёнок не найден в вашей семье");
+  }
+  await setSessionCookie({ role: "parent", childId: target.id, phone: session.phone });
   redirect("/parent");
 }
 

@@ -1,11 +1,14 @@
 import { requireTrainer } from "@/lib/auth";
+import { getAppSettings } from "@/lib/appSettings";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { ChangePasswordForm } from "@/components/trainer/ChangePasswordForm";
-import { RunPaymentRemindersButton } from "@/components/trainer/RunPaymentRemindersButton";
+import { RunDailyRemindersButton } from "@/components/trainer/RunDailyRemindersButton";
+import { BirthdayGreetingsToggle } from "@/components/trainer/BirthdayGreetingsToggle";
 
 export default async function SettingsPage() {
   const trainer = await requireTrainer();
+  const appSettings = trainer.role === "HEAD" ? await getAppSettings() : null;
 
   return (
     <>
@@ -20,15 +23,18 @@ export default async function SettingsPage() {
       {trainer.role === "HEAD" && (
         <Card className="mt-6 max-w-md">
           <CardBody>
-            <h2 className="mb-2 font-heading text-lg font-bold">Напоминания об оплате</h2>
+            <h2 className="mb-2 font-heading text-lg font-bold">Суточные напоминания</h2>
             <p className="mb-4 text-sm text-brand-text/60">
-              Автоматически проверяются раз в сутки в 10:00 по Новосибирску. Кнопка
-              ниже запускает ту же проверку вручную — полезно, если нужно
-              подтвердить настройку или сервер пропустил суточный запуск.
-              Повторный запуск безопасен: уже отправленные напоминания не
-              дублируются.
+              Оплата, справки и дни рождения проверяются автоматически раз в
+              сутки в 10:00 по Новосибирску. Кнопка ниже запускает ту же
+              проверку вручную — полезно, если нужно подтвердить настройку
+              или сервер пропустил суточный запуск. Повторный запуск
+              безопасен: уже отправленные напоминания не дублируются.
             </p>
-            <RunPaymentRemindersButton />
+            <RunDailyRemindersButton />
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <BirthdayGreetingsToggle enabled={appSettings?.sendBirthdayGreetings ?? false} />
+            </div>
           </CardBody>
         </Card>
       )}

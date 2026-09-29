@@ -2,7 +2,11 @@ import { SignJWT, jwtVerify } from "jose";
 
 export type SessionPayload =
   | { role: "trainer"; trainerId: string }
-  | { role: "parent"; childId: string }
+  // phone — телефон семьи (Child.parentPhone), childId — какой ребёнок сейчас
+  // активен в кабинете. Один родитель с несколькими детьми переключается
+  // между ними (переподписывая childId на тот же phone), не логинясь заново —
+  // см. switchActiveChildAction в src/lib/actions/login-actions.ts.
+  | { role: "parent"; childId: string; phone: string }
   | { role: "athlete"; athleteId: string };
 
 const COOKIE_NAME = "session";
@@ -54,8 +58,12 @@ export async function verifySession(
     if (payload.role === "trainer" && typeof payload.trainerId === "string") {
       return { role: "trainer", trainerId: payload.trainerId };
     }
-    if (payload.role === "parent" && typeof payload.childId === "string") {
-      return { role: "parent", childId: payload.childId };
+    if (
+      payload.role === "parent" &&
+      typeof payload.childId === "string" &&
+      typeof payload.phone === "string"
+    ) {
+      return { role: "parent", childId: payload.childId, phone: payload.phone };
     }
     if (payload.role === "athlete" && typeof payload.athleteId === "string") {
       return { role: "athlete", athleteId: payload.athleteId };

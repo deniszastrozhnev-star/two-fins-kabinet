@@ -70,13 +70,14 @@ export async function updateChildAction(
   });
   const { groupId: requestedGroupId, ...data } = readChildFields(formData);
 
+  let updated;
   if (requestedGroupId !== undefined && requestedGroupId !== (existing?.groupId ?? null)) {
-    await prisma.child.update({ where: { id }, data: { ...data, groupId: null } });
+    updated = await prisma.child.update({ where: { id }, data: { ...data, groupId: null } });
     if (requestedGroupId) {
       await assignOrWaitlist(id, requestedGroupId);
     }
   } else {
-    await prisma.child.update({ where: { id }, data });
+    updated = await prisma.child.update({ where: { id }, data });
   }
 
   revalidatePath("/trainer/children");
@@ -87,7 +88,7 @@ export async function updateChildAction(
   const paidUntilChanged =
     (existing?.paidUntil?.getTime() ?? null) !== (data.paidUntil?.getTime() ?? null);
   if (paidUntilChanged && data.paidUntil) {
-    await sendPaymentAcceptedPush(id, data.paidUntil).catch((err) =>
+    await sendPaymentAcceptedPush(updated, data.paidUntil).catch((err) =>
       console.error("updateChildAction: push failed", err),
     );
   }
@@ -100,7 +101,7 @@ export async function markPaidAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Не найден ребёнок");
   const paidUntil = endOfMonth(new Date());
-  await prisma.child.update({
+  const updated = await prisma.child.update({
     where: { id },
     data: { paidUntil },
   });
@@ -109,7 +110,7 @@ export async function markPaidAction(formData: FormData) {
   revalidatePath("/parent", "layout");
 
   // Не блокируем отметку оплаты, если push не настроен или упал.
-  await sendPaymentAcceptedPush(id, paidUntil).catch((err) =>
+  await sendPaymentAcceptedPush(updated, paidUntil).catch((err) =>
     console.error("markPaidAction: push failed", err),
   );
 }

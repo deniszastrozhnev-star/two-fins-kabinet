@@ -94,8 +94,9 @@ model Child {
   waitlistEntries          GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
   linkedAthlete            Athlete?
-  pushSubscriptions        PushSubscription[]
   paymentRemindersSent     PaymentReminderSent[]
+  medicalRemindersSent     MedicalReminderSent[]
+  birthdayGreetingsSent    BirthdayGreetingSent[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -511,19 +512,20 @@ model EventSignup {
   @@unique([eventId, childId])
 }
 
-// Один родитель может открыть кабинет на нескольких устройствах — у каждого
-// своя подписка (endpoint уникален per браузер/устройство), поэтому это
-// список, а не одна запись на ребёнка.
+// Подписка привязана к семье (номеру телефона родителя), а не к конкретному
+// ребёнку — у одного родителя может быть несколько детей, и устройство должно
+// получать уведомления про всех, а не только про того, кто был активен на
+// экране в момент подписки. Один родитель может открыть кабинет на нескольких
+// устройствах — у каждого своя подписка (endpoint уникален per браузер/устройство).
 model PushSubscription {
-  id        String   @id @default(cuid())
-  childId   String
-  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  parentPhone String
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  createdAt   DateTime @default(now())
 
-  @@index([childId])
+  @@index([parentPhone])
 }
 
 enum PaymentReminderKind {
@@ -556,4 +558,47 @@ model FinanceSettings {
   id             String   @id @default("singleton")
   monthlyRentRub Int      @default(180000)
   updatedAt      DateTime @updatedAt
+}
+
+enum MedicalReminderKind {
+  BEFORE_14D // за 14 дней до окончания действия анализов
+  DUE_TODAY // в день окончания
+}
+
+// Журнал отправленных напоминаний о справке — тот же паттерн защиты от
+// дублей, что и PaymentReminderSent: уникальность по (childId, kind,
+// validUntil) — если родитель загрузит новую справку с другим сроком, для
+// него напоминания смогут сработать заново на общих основаниях.
+model MedicalReminderSent {
+  id         String              @id @default(cuid())
+  childId    String
+  child      Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  kind       MedicalReminderKind
+  validUntil DateTime
+  sentAt     DateTime            @default(now())
+
+  @@unique([childId, kind, validUntil])
+  @@index([childId])
+}
+
+// Отправлено ли поздравление с днём рождения — раз в год на ребёнка (year —
+// календарный год отправки, а не год рождения), чтобы не задублировать при
+// повторном суточном тике/ручном запуске в тот же день.
+model BirthdayGreetingSent {
+  id      String @id @default(cuid())
+  childId String
+  child   Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  year    Int
+  sentAt  DateTime @default(now())
+
+  @@unique([childId, year])
+  @@index([childId])
+}
+
+// Единственная строка общих настроек приложения — тот же singleton-паттерн,
+// что и FinanceSettings, но для не-финансовых переключателей.
+model AppSettings {
+  id                     String   @id @default("singleton")
+  sendBirthdayGreetings  Boolean  @default(false)
+  updatedAt              DateTime @updatedAt
 }

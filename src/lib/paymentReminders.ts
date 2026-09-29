@@ -1,7 +1,7 @@
 import "server-only";
 import { Prisma, PaymentReminderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendPushToChild } from "@/lib/push";
+import { sendCombinedFamilyPushes, type FamilyReminderEntry } from "@/lib/familyReminders";
 import { formatDateRu } from "@/lib/dates";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -23,25 +23,26 @@ const CASES: {
   kind: PaymentReminderKind;
   offsetDays: number;
   title: string;
-  body: (dateLabel: string) => string;
+  body: (childName: string, dateLabel: string) => string;
 }[] = [
   {
     kind: "BEFORE_3D",
     offsetDays: 3,
     title: "Скоро закончится оплата",
-    body: (d) => `Занятия оплачены до ${d} — через 3 дня понадобится продление.`,
+    body: (name, d) => `${name}: занятия оплачены до ${d} — через 3 дня понадобится продление.`,
   },
   {
     kind: "DUE_TODAY",
     offsetDays: 0,
     title: "Сегодня последний оплаченный день",
-    body: (d) => `Оплата заканчивается сегодня (${d}). Продлите занятия, чтобы не пропустить тренировки.`,
+    body: (name, d) =>
+      `${name}: оплата заканчивается сегодня (${d}). Продлите занятия, чтобы не пропустить тренировки.`,
   },
   {
     kind: "OVERDUE_3D",
     offsetDays: -3,
     title: "Оплата просрочена",
-    body: (d) => `Оплата закончилась ${d} — пожалуйста, продлите занятия.`,
+    body: (name, d) => `${name}: оплата закончилась ${d} — пожалуйста, продлите занятия.`,
   },
 ];
 
@@ -52,11 +53,14 @@ const CASES: {
  * (см. комментарий к PaymentReminderSent в schema.prisma). "Отправлено" фиксируется
  * ДО реальной отправки push — уникальный индекс ловит дубль (гонка/повторный
  * тик/несколько инстансов процесса) раньше, чем уйдёт второй push.
+ * Если у одной семьи в этот прогон совпало сразу несколько детей (или
+ * несколько случаев), уходит один push на семью — см. sendCombinedFamilyPushes.
  */
 export async function runPaymentReminders(): Promise<{ sent: number; alreadySent: number }> {
   const today = novosibirskTodayUtcMidnight();
   let sent = 0;
   let alreadySent = 0;
+  const entriesByPhone = new Map<string, FamilyReminderEntry[]>();
 
   for (const c of CASES) {
     const targetDayStart = new Date(today.getTime() + c.offsetDays * DAY_MS);
@@ -67,7 +71,7 @@ export async function runPaymentReminders(): Promise<{ sent: number; alreadySent
         status: "ACTIVE",
         paidUntil: { gte: targetDayStart, lt: targetDayEnd },
       },
-      select: { id: true, paidUntil: true },
+      select: { id: true, lastName: true, firstName: true, parentPhone: true, paidUntil: true },
     });
 
     for (const child of children) {
@@ -85,14 +89,15 @@ export async function runPaymentReminders(): Promise<{ sent: number; alreadySent
         throw err;
       }
 
-      await sendPushToChild(child.id, {
-        title: c.title,
-        body: c.body(formatDateRu(child.paidUntil)),
-        url: "/parent",
-      }).catch((err) => console.error("runPaymentReminders: push failed", err));
+      const childName = `${child.lastName} ${child.firstName}`;
+      const list = entriesByPhone.get(child.parentPhone) ?? [];
+      list.push({ title: c.title, body: c.body(childName, formatDateRu(child.paidUntil)) });
+      entriesByPhone.set(child.parentPhone, list);
       sent++;
     }
   }
+
+  await sendCombinedFamilyPushes(entriesByPhone, "Напоминания об оплате");
 
   return { sent, alreadySent };
 }

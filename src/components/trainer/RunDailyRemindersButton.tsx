@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { runPaymentRemindersNowAction } from "@/lib/actions/payment-reminder-actions";
+import { runDailyRemindersNowAction } from "@/lib/actions/daily-reminder-actions";
 import { SaveButton } from "@/components/trainer/SaveButton";
 
-export function RunPaymentRemindersButton() {
-  const [state, formAction] = useActionState(runPaymentRemindersNowAction, undefined);
+export function RunDailyRemindersButton() {
+  const [state, formAction] = useActionState(runDailyRemindersNowAction, undefined);
 
   return (
     <form action={formAction} className="flex flex-col items-start gap-3">

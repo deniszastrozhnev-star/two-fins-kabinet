@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireParentChild } from "@/lib/auth";
+import { requireParentFamily } from "@/lib/auth";
 import { getWorkoffBalance } from "@/lib/workoffs";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
@@ -14,6 +14,7 @@ import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
 import { ContractUpload } from "@/components/parent/ContractUpload";
 import { StoryRail } from "@/components/shared/StoryRail";
+import { FamilySummaryCard } from "@/components/parent/FamilySummaryCard";
 
 // Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
 // перекодирует в JPEG) — на Vercel по умолчанию Server Action может упереться
@@ -25,8 +26,8 @@ const SBP_LINK =
   "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
 export default async function ParentOverviewPage() {
-  const child = await requireParentChild();
-  const [balance, payment, latestCertificate, latestContract, results, storiesFeed] =
+  const { child, siblings } = await requireParentFamily();
+  const [balance, payment, latestCertificate, latestContract, results, storiesFeed, familyRows] =
     await Promise.all([
       getWorkoffBalance(child.id),
       Promise.resolve(getPaymentStatus(child.paidUntil)),
@@ -43,11 +44,42 @@ export default async function ParentOverviewPage() {
         orderBy: { date: "desc" },
       }),
       getActiveStoriesFeed({ role: "parent", id: child.id }),
+      siblings.length > 1
+        ? Promise.all(
+            siblings.map(async (s) => {
+              const [cert, contract] = await Promise.all([
+                prisma.medicalCertificate.findFirst({
+                  where: { childId: s.id },
+                  orderBy: { createdAt: "desc" },
+                  select: { validUntil: true },
+                }),
+                prisma.contractDocument.findFirst({
+                  where: { childId: s.id },
+                  select: { id: true },
+                }),
+              ]);
+              return {
+                id: s.id,
+                name: `${s.lastName} ${s.firstName}`,
+                isActive: s.id === child.id,
+                payment: getPaymentStatus(s.paidUntil),
+                medical: getMedicalStatus(cert?.validUntil ?? null),
+                contractUploaded: contract != null,
+              };
+            }),
+          )
+        : Promise.resolve([]),
     ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
 
   return (
     <>
+      {familyRows.length > 1 && (
+        <div className="mb-6">
+          <FamilySummaryCard rows={familyRows} />
+        </div>
+      )}
+
       <PageHeader
         title="Обзор"
         description={

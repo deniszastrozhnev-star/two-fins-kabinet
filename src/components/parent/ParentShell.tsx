@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
+import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import type { NavCardItem } from "@/components/shared/NavCard";
 import {
   PaymentIcon,
@@ -20,6 +21,8 @@ import type { MedicalStatus } from "@/lib/medical";
 export function ParentShell({
   children,
   childName,
+  childId,
+  siblings,
   contractUploaded,
   payment,
   medical,
@@ -29,6 +32,8 @@ export function ParentShell({
 }: {
   children: React.ReactNode;
   childName: string;
+  childId: string;
+  siblings: { id: string; lastName: string; firstName: string }[];
   contractUploaded: boolean;
   payment: PaymentStatus;
   medical: MedicalStatus;
@@ -91,11 +96,16 @@ export function ParentShell({
             </p>
             <p className="text-xs text-brand-text/50">{childName}</p>
           </Link>
-          <form action={logoutAction}>
-            <Button type="submit" variant="ghost" size="sm">
-              Выйти
-            </Button>
-          </form>
+          <div className="flex items-center gap-2">
+            {siblings.length > 1 && (
+              <ChildSwitcher siblings={siblings} activeChildId={childId} />
+            )}
+            <form action={logoutAction}>
+              <Button type="submit" variant="ghost" size="sm">
+                Выйти
+              </Button>
+            </form>
+          </div>
         </div>
       </header>
 

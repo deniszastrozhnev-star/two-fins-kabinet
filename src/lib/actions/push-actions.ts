@@ -5,21 +5,21 @@ import { requireParentChild } from "@/lib/auth";
 
 type PushKeys = { endpoint: string; keys: { p256dh: string; auth: string } };
 
-/** Сохраняет/обновляет push-подписку текущего родителя. Вызывается напрямую
- * из клиентского компонента (не через <form>), поэтому принимает обычный
- * объект, а не FormData. */
+/** Сохраняет/обновляет push-подписку текущей семьи (по телефону — см. схему
+ * PushSubscription). Вызывается напрямую из клиентского компонента (не через
+ * <form>), поэтому принимает обычный объект, а не FormData. */
 export async function subscribePushAction(sub: PushKeys): Promise<void> {
   const child = await requireParentChild();
   await prisma.pushSubscription.upsert({
     where: { endpoint: sub.endpoint },
     create: {
-      childId: child.id,
+      parentPhone: child.parentPhone,
       endpoint: sub.endpoint,
       p256dh: sub.keys.p256dh,
       auth: sub.keys.auth,
     },
     update: {
-      childId: child.id,
+      parentPhone: child.parentPhone,
       p256dh: sub.keys.p256dh,
       auth: sub.keys.auth,
     },
