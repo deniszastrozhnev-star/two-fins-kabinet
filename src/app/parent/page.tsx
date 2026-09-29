@@ -11,6 +11,7 @@ import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
 import { ContractUpload } from "@/components/parent/ContractUpload";
 import { FamilySummaryCard } from "@/components/parent/FamilySummaryCard";
+import { UnseenEventBanner } from "@/components/parent/UnseenEventBanner";
 
 // Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
 // перекодирует в JPEG) — на Vercel по умолчанию Server Action может упереться
@@ -23,7 +24,7 @@ const SBP_LINK =
 
 export default async function ParentOverviewPage() {
   const { child, siblings } = await requireParentFamily();
-  const [payment, latestCertificate, latestContract, familyRows] = await Promise.all([
+  const [payment, latestCertificate, latestContract, latestEvent, familyRows] = await Promise.all([
     Promise.resolve(getPaymentStatus(child.paidUntil)),
     prisma.medicalCertificate.findFirst({
       where: { childId: child.id },
@@ -32,6 +33,10 @@ export default async function ParentOverviewPage() {
     prisma.contractDocument.findFirst({
       where: { childId: child.id },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.event.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { title: true, description: true, createdAt: true },
     }),
     siblings.length > 1
       ? Promise.all(
@@ -60,12 +65,20 @@ export default async function ParentOverviewPage() {
       : Promise.resolve([]),
   ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
+  const isEventUnseen =
+    latestEvent != null && (!child.lastSeenEventsAt || latestEvent.createdAt > child.lastSeenEventsAt);
 
   return (
     <>
       {familyRows.length > 1 && (
         <div className="mb-6">
           <FamilySummaryCard rows={familyRows} />
+        </div>
+      )}
+
+      {isEventUnseen && latestEvent && (
+        <div className="mb-6">
+          <UnseenEventBanner title={latestEvent.title} description={latestEvent.description} />
         </div>
       )}
 

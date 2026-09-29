@@ -71,18 +71,23 @@ enum ChildStatus {
 }
 
 model Child {
-  id          String      @id @default(cuid())
-  lastName    String
-  firstName   String
-  groupId     String?
-  group       Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  parentPhone String // хранится нормализованным (только цифры)
-  paidUntil   DateTime?
-  status      ChildStatus @default(ACTIVE)
-  note        String? // заметка тренера (например при звонке "холодному" ребёнку)
-  birthDate   DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  lastName         String
+  firstName        String
+  groupId          String?
+  group            Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentPhone      String // хранится нормализованным (только цифры)
+  paidUntil        DateTime?
+  status           ChildStatus @default(ACTIVE)
+  note             String? // заметка тренера (например при звонке "холодному" ребёнку)
+  birthDate        DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
+  avatarUrl        String? // фото профиля, загружает родитель в кабинете
+  // Когда родитель последний раз открывал "Новости" для ЭТОГО ребёнка — своя
+  // отметка на каждого ребёнка семьи (не общая на телефон), чтобы баннер
+  // "новая новость" на первом экране не путался при переключении между детьми.
+  lastSeenEventsAt DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   attendanceRecords        AttendanceRecord[]
   eventSignups             EventSignup[]

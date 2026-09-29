@@ -3,31 +3,42 @@ import { logoutAction } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/Button";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
+import { ChildAvatarUpload } from "@/components/parent/ChildAvatarUpload";
 import type { NavCardItem } from "@/components/shared/NavCard";
-import { PaymentIcon, RegisterIcon, AttendanceIcon, MoreIcon } from "@/components/icons";
+import { PaymentIcon, RegisterIcon, AttendanceIcon, NewsIcon, MoreIcon } from "@/components/icons";
+import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 import type { PaymentStatus } from "@/lib/payment";
 import type { MedicalStatus } from "@/lib/medical";
+import type { AthleteRank } from "@prisma/client";
 
 /** Упрощённый первый экран: на виду только оплата, документы (справка+договор
- * одним пунктом) и расписание — всё остальное (отработки, результаты,
- * курсовка, новости, календарь посещений, тренеры) убрано в "Ещё", без
+ * одним пунктом), расписание и новости — всё остальное (отработки,
+ * результаты, курсовка, календарь посещений, тренеры) убрано в "Ещё", без
  * потери функций — см. /parent/more. */
 export function ParentShell({
   children,
   childName,
   childId,
+  childAvatarUrl,
+  groupLabel,
+  athleteRank,
   siblings,
   contractUploaded,
   payment,
   medical,
+  hasUnseenEvent,
 }: {
   children: React.ReactNode;
   childName: string;
   childId: string;
+  childAvatarUrl: string | null;
+  groupLabel: string | null;
+  athleteRank: AthleteRank | null;
   siblings: { id: string; lastName: string; firstName: string }[];
   contractUploaded: boolean;
   payment: PaymentStatus;
   medical: MedicalStatus;
+  hasUnseenEvent: boolean;
 }) {
   const iconClass = "h-6 w-6";
 
@@ -57,6 +68,12 @@ export function ParentShell({
       icon: <AttendanceIcon className={iconClass} />,
     },
     {
+      href: "/parent/events",
+      label: "Новости",
+      icon: <NewsIcon className={iconClass} />,
+      badge: hasUnseenEvent ? { label: "Новое", tone: "cyan" } : undefined,
+    },
+    {
       href: "/parent/more",
       label: "Ещё",
       icon: <MoreIcon className={iconClass} />,
@@ -71,7 +88,6 @@ export function ParentShell({
             <p className="font-heading text-base font-bold text-brand-cyan leading-tight">
               Two Fins (Две Ласты)
             </p>
-            <p className="text-xs text-brand-text/50">{childName}</p>
           </Link>
           <div className="flex items-center gap-2">
             {siblings.length > 1 && (
@@ -86,8 +102,27 @@ export function ParentShell({
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-        <NavCardGrid items={items} />
+      <div className="mx-auto w-full max-w-3xl px-4 pt-6">
+        <div className="flex flex-col items-center gap-2 pb-6 text-center">
+          <ChildAvatarUpload name={childName} url={childAvatarUrl} size={96} />
+          <p className="font-heading text-xl font-bold">{childName}</p>
+          {groupLabel && <p className="text-sm text-brand-text/60">{groupLabel}</p>}
+          {athleteRank && (
+            <span
+              className="mt-1 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold"
+              style={{
+                color: ATHLETE_RANK_COLORS[athleteRank],
+                backgroundColor: `${ATHLETE_RANK_COLORS[athleteRank]}22`,
+              }}
+            >
+              {ATHLETE_RANK_LABELS[athleteRank]}
+            </span>
+          )}
+        </div>
+
+        <div className="border-t border-white/10 pt-4">
+          <NavCardGrid items={items} />
+        </div>
       </div>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">

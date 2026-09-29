@@ -5,14 +5,7 @@ import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
 import type { NavCardItem } from "@/components/shared/NavCard";
-import {
-  WorkoffIcon,
-  TrophyIcon,
-  MetricsIcon,
-  NewsIcon,
-  CalendarIcon,
-  TrainerIcon,
-} from "@/components/icons";
+import { WorkoffIcon, TrophyIcon, MetricsIcon, CalendarIcon, TrainerIcon } from "@/components/icons";
 
 /** Всё, что убрали с первого экрана (см. ParentShell) — сюда, без потери
  * функций: те же разделы, что были раньше, просто на отдельной странице. */
@@ -48,7 +41,6 @@ export default async function ParentMorePage() {
       icon: <MetricsIcon className={iconClass} />,
       badge: { label: courseResultsCount > 0 ? `${courseResultsCount}` : "Нет", tone: "neutral" },
     },
-    { href: "/parent/events", label: "Новости", icon: <NewsIcon className={iconClass} /> },
     { href: "/parent/calendar", label: "Календарь", icon: <CalendarIcon className={iconClass} /> },
     { href: "/parent/trainers", label: "Наши тренеры", icon: <TrainerIcon className={iconClass} /> },
   ];
