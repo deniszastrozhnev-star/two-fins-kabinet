@@ -34,7 +34,12 @@ function readChildFields(formData: FormData) {
   return { lastName, firstName, groupId, parentPhone, paidUntil, birthDate };
 }
 
-export async function createChildAction(formData: FormData) {
+export type ChildFormState = { error?: string; success?: string } | undefined;
+
+export async function createChildAction(
+  _prevState: ChildFormState,
+  formData: FormData,
+): Promise<ChildFormState> {
   await requireTrainer();
   const { groupId: requestedGroupId, ...data } = readChildFields(formData);
   const child = await prisma.child.create({ data: { ...data, groupId: null } });
@@ -46,13 +51,22 @@ export async function createChildAction(formData: FormData) {
   redirect("/trainer/children");
 }
 
-export async function updateChildAction(formData: FormData) {
+/** Сохраняет карточку ребёнка, включая "Оплачено до" — если дата оплаты
+ * действительно изменилась (на непустое значение), сразу уходит push
+ * "Оплата принята" с тем же значением, что и сохранили, без отдельного
+ * захода и без отдельной кнопки "Оплачено" (та подставляет конец месяца
+ * безусловно — если после ручной даты ещё нажать её, дата тихо перезапишется
+ * концом месяца; теперь push уходит уже на этом шаге, второй заход не нужен). */
+export async function updateChildAction(
+  _prevState: ChildFormState,
+  formData: FormData,
+): Promise<ChildFormState> {
   await requireTrainer();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Не найден ребёнок");
   const existing = await prisma.child.findUnique({
     where: { id },
-    select: { groupId: true },
+    select: { groupId: true, paidUntil: true },
   });
   const { groupId: requestedGroupId, ...data } = readChildFields(formData);
 
@@ -69,7 +83,16 @@ export async function updateChildAction(formData: FormData) {
   revalidatePath(`/trainer/children/${id}`);
   revalidatePath("/trainer/schedule");
   revalidatePath("/parent", "layout");
-  redirect("/trainer/children");
+
+  const paidUntilChanged =
+    (existing?.paidUntil?.getTime() ?? null) !== (data.paidUntil?.getTime() ?? null);
+  if (paidUntilChanged && data.paidUntil) {
+    await sendPaymentAcceptedPush(id, data.paidUntil).catch((err) =>
+      console.error("updateChildAction: push failed", err),
+    );
+  }
+
+  return { success: "Сохранено" };
 }
 
 export async function markPaidAction(formData: FormData) {
