@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { ChildAvatarUpload } from "@/components/parent/ChildAvatarUpload";
+import { ChildCardActions } from "@/components/parent/ChildCardActions";
 import type { NavCardItem } from "@/components/shared/NavCard";
 import { PaymentIcon, RegisterIcon, AttendanceIcon, NewsIcon, MoreIcon } from "@/components/icons";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
@@ -22,6 +23,7 @@ export function ParentShell({
   childAvatarUrl,
   groupLabel,
   athleteRank,
+  chatUrl,
   siblings,
   contractUploaded,
   payment,
@@ -34,6 +36,7 @@ export function ParentShell({
   childAvatarUrl: string | null;
   groupLabel: string | null;
   athleteRank: AthleteRank | null;
+  chatUrl: string | null;
   siblings: { id: string; lastName: string; firstName: string }[];
   contractUploaded: boolean;
   payment: PaymentStatus;
@@ -118,6 +121,9 @@ export function ParentShell({
               {ATHLETE_RANK_LABELS[athleteRank]}
             </span>
           )}
+          <div className="mt-2">
+            <ChildCardActions chatUrl={chatUrl} />
+          </div>
         </div>
 
         <div className="border-t border-white/10 pt-4">

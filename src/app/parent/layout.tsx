@@ -54,6 +54,7 @@ export default async function ParentLayout({
       childAvatarUrl={childAvatarUrl}
       groupLabel={groupLabel}
       athleteRank={linkedAthlete?.rank ?? null}
+      chatUrl={child.group?.chatUrl ?? null}
       siblings={siblings}
       contractUploaded={contractUploaded}
       payment={payment}

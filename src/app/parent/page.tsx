@@ -89,18 +89,6 @@ export default async function ParentOverviewPage() {
             ? `${child.group.name} · ${LEVEL_LABELS[child.group.level]}`
             : "Группа пока не назначена"
         }
-        action={
-          child.group?.chatUrl ? (
-            <a
-              href={child.group.chatUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-violet px-4 py-2.5 text-sm font-semibold text-brand-text transition hover:brightness-110"
-            >
-              Вступить в чат группы
-            </a>
-          ) : undefined
-        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
