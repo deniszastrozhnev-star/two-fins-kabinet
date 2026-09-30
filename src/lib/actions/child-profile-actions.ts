@@ -41,12 +41,16 @@ export async function uploadChildAvatarAction(
 
 /** Отмечает "Новости" просмотренными для текущего активного ребёнка — баннер
  * непрочитанной новости на первом экране больше не покажется, пока не
- * появится что-то новее этого момента. */
+ * появится что-то новее этого момента.
+ * Вызывается напрямую из рендера ParentEventsPage (не из формы/клика), поэтому
+ * без revalidatePath — этот вызов допустим только внутри настоящего Server
+ * Action, вызванного по клику/сабмиту, а не при рендере страницы; здесь он
+ * и не нужен: /parent — динамический маршрут и читает lastSeenEventsAt заново
+ * при каждом заходе, без всякого кеша, который надо было бы сбрасывать. */
 export async function markEventsSeenAction(): Promise<void> {
   const child = await requireParentChild();
   await prisma.child.update({
     where: { id: child.id },
     data: { lastSeenEventsAt: new Date() },
   });
-  revalidatePath("/parent", "layout");
 }
