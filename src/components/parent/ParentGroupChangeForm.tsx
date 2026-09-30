@@ -1,33 +1,33 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { updateChildGroupAction } from "@/lib/actions/extra-session-actions";
+import { changeOwnChildGroupAction } from "@/lib/actions/parent-actions";
 import { computeCombinedPrice, GroupOption, type ChildGroupOption } from "@/components/shared/GroupPicker";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { LEVEL_LABELS, LEVEL_ORDER } from "@/lib/labels";
 
-export type { ChildGroupOption };
-
-/** Тот же конструктор, что в онлайн-записи (уровни → группы, доп. занятие в
- * том же бассейне, живой пересчёт цены) — только для уже существующего
- * ребёнка: предзаполнен текущей группой/доп. занятием, сохранение сразу
- * назначает группу (с учётом листа ожидания) и обновляет доп. занятие. */
-export function ChildGroupForm({
-  childId,
+/** Тот же конструктор группы, что у тренера (ChildGroupForm) и в онлайн-записи
+ * — с одним отличием: если смена группы меняет тариф, перед сохранением
+ * нужно явно нажать «Проверить стоимость» и увидеть цену до/после, прежде
+ * чем появится кнопка «Сохранить». Действует сразу, без подтверждения
+ * тренера — предполагается родительская ответственность за выбор. */
+export function ParentGroupChangeForm({
   groups,
   currentGroupId,
   currentExtraGroupId,
+  currentPrice,
 }: {
-  childId: string;
   groups: ChildGroupOption[];
   currentGroupId: string | null;
   currentExtraGroupId: string | null;
+  currentPrice: number | null;
 }) {
-  const [state, formAction] = useActionState(updateChildGroupAction, undefined);
+  const [state, formAction] = useActionState(changeOwnChildGroupAction, undefined);
 
   const [baseGroupId, setBaseGroupId] = useState<string>(currentGroupId ?? "");
   const [wantsExtra, setWantsExtra] = useState(currentExtraGroupId != null);
   const [extraGroupId, setExtraGroupId] = useState<string>(currentExtraGroupId ?? "");
+  const [confirmed, setConfirmed] = useState(false);
 
   const baseGroup = groups.find((g) => g.id === baseGroupId) ?? null;
   const extraCandidates = useMemo(
@@ -36,17 +36,24 @@ export function ChildGroupForm({
   );
   const extraGroup = extraCandidates.find((g) => g.id === extraGroupId) ?? null;
 
-  const price = baseGroup ? computeCombinedPrice(baseGroup, wantsExtra ? extraGroup : null) : null;
+  const newPrice = baseGroup ? computeCombinedPrice(baseGroup, wantsExtra ? extraGroup : null) : null;
 
   const groupsByLevel = LEVEL_ORDER.map((level) => ({
     level,
     groups: groups.filter((g) => g.level === level),
   })).filter((section) => section.groups.length > 0);
 
+  const somethingChanged =
+    baseGroupId !== (currentGroupId ?? "") ||
+    (wantsExtra ? extraGroupId : "") !== (currentExtraGroupId ?? "");
+  const priceChanged = somethingChanged && newPrice !== currentPrice;
+
+  function resetConfirmation() {
+    setConfirmed(false);
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="childId" value={childId} />
-
       <div>
         <p className="mb-2 text-sm font-medium text-brand-text/80">Группа</p>
         <div className="flex flex-col gap-3">
@@ -60,6 +67,7 @@ export function ChildGroupForm({
                 setBaseGroupId("");
                 setExtraGroupId("");
                 setWantsExtra(false);
+                resetConfirmation();
               }}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
@@ -80,6 +88,7 @@ export function ChildGroupForm({
                     onChange={() => {
                       setBaseGroupId(g.id);
                       setExtraGroupId("");
+                      resetConfirmation();
                     }}
                   />
                 ))}
@@ -98,6 +107,7 @@ export function ChildGroupForm({
               onChange={(e) => {
                 setWantsExtra(e.target.checked);
                 setExtraGroupId("");
+                resetConfirmation();
               }}
             />
             Доп. занятие в другой группе
@@ -116,7 +126,10 @@ export function ChildGroupForm({
                     group={g}
                     name="extraGroupId"
                     checked={extraGroupId === g.id}
-                    onChange={() => setExtraGroupId(g.id)}
+                    onChange={() => {
+                      setExtraGroupId(g.id);
+                      resetConfirmation();
+                    }}
                   />
                 ))
               )}
@@ -125,11 +138,33 @@ export function ChildGroupForm({
         </div>
       )}
 
-      {price != null && (
+      {priceChanged && !confirmed && (
+        <button
+          type="button"
+          onClick={() => setConfirmed(true)}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-sm font-medium text-amber-200 transition hover:bg-amber-500/15"
+        >
+          Стоимость изменится — нажмите, чтобы проверить перед сохранением
+        </button>
+      )}
+
+      {priceChanged && confirmed && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm text-amber-200">
+            Стоимость изменится:{" "}
+            <span className="line-through opacity-70">
+              {currentPrice != null ? `${currentPrice.toLocaleString("ru-RU")}₽` : "—"}
+            </span>{" "}
+            → <span className="font-semibold">{newPrice != null ? `${newPrice.toLocaleString("ru-RU")}₽` : "—"}/мес</span>
+          </p>
+        </div>
+      )}
+
+      {!priceChanged && newPrice != null && somethingChanged && (
         <div className="rounded-xl border border-brand-cyan/30 bg-brand-cyan/10 px-4 py-3">
-          <p className="text-sm text-brand-text/70">Итоговая стоимость</p>
+          <p className="text-sm text-brand-text/70">Стоимость без изменений</p>
           <p className="font-heading text-xl font-bold text-brand-cyan">
-            {price.toLocaleString("ru-RU")}₽/мес
+            {newPrice.toLocaleString("ru-RU")}₽/мес
           </p>
         </div>
       )}
@@ -143,9 +178,11 @@ export function ChildGroupForm({
         </p>
       )}
 
-      <div className="flex justify-end">
-        <SaveButton>Сохранить группу</SaveButton>
-      </div>
+      {somethingChanged && (!priceChanged || confirmed) && (
+        <div className="flex justify-end">
+          <SaveButton>Сохранить</SaveButton>
+        </div>
+      )}
     </form>
   );
 }

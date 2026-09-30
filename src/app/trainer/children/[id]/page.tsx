@@ -126,27 +126,41 @@ export default async function ChildDetailPage({
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-heading text-lg font-bold">
-              Данные ребёнка
-            </h2>
-            <ChildForm
-              action={updateChildAction}
-              groups={groups}
-              hideGroupField
-              initial={{
-                id: child.id,
-                lastName: child.lastName,
-                firstName: child.firstName,
-                groupId: child.groupId,
-                parentPhone: child.parentPhone,
-                paidUntil: child.paidUntil,
-                birthDate: child.birthDate,
-              }}
-            />
-          </CardBody>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardBody>
+              <h2 className="mb-4 font-heading text-lg font-bold">
+                Данные ребёнка
+              </h2>
+              <ChildForm
+                action={updateChildAction}
+                groups={groups}
+                hideGroupField
+                initial={{
+                  id: child.id,
+                  lastName: child.lastName,
+                  firstName: child.firstName,
+                  groupId: child.groupId,
+                  parentPhone: child.parentPhone,
+                  paidUntil: child.paidUntil,
+                  birthDate: child.birthDate,
+                }}
+              />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody>
+              <h2 className="mb-3 font-heading text-lg font-bold">Группа и доп. занятие</h2>
+              <ChildGroupForm
+                childId={child.id}
+                groups={groups}
+                currentGroupId={child.groupId}
+                currentExtraGroupId={extraSessions[0]?.groupId ?? null}
+              />
+            </CardBody>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-6">
           <Card>
@@ -176,18 +190,6 @@ export default async function ChildDetailPage({
                   {balance > 0 ? balance : 0}
                 </p>
               </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <h2 className="mb-3 font-heading text-lg font-bold">Группа и доп. занятие</h2>
-              <ChildGroupForm
-                childId={child.id}
-                groups={groups}
-                currentGroupId={child.groupId}
-                currentExtraGroupId={extraSessions[0]?.groupId ?? null}
-              />
             </CardBody>
           </Card>
 

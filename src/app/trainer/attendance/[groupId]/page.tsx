@@ -51,7 +51,7 @@ export default async function AttendanceGroupPage({
     searchParamsResolved.conflicts ? searchParamsResolved.conflicts.split(",") : [],
   );
 
-  const [children, records, courseResultsToday] = await Promise.all([
+  const [children, records, courseResultsToday, absenceNotices] = await Promise.all([
     prisma.child.findMany({
       where: { groupId },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -65,8 +65,17 @@ export default async function AttendanceGroupPage({
       where: { date, competitionName: COURSE_RESULT_NAME },
       select: { childId: true },
     }),
+    prisma.parentAbsenceNotice.findMany({
+      where: { groupId, date },
+      select: { childId: true },
+    }),
   ]);
   const recordByChildId = new Map(records.map((r) => [r.childId, r]));
+  // Пришедшая через кабинет родителя пометка "не придём" — актуальна, только
+  // пока по этому дню/группе нет отдельной отметки тренера (см. workoffs.ts).
+  const notifiedChildIds = new Set(
+    absenceNotices.filter((n) => !recordByChildId.has(n.childId)).map((n) => n.childId),
+  );
   const childIdsWithCourseResultToday = new Set(courseResultsToday.map((r) => r.childId));
   const homeChildIds = new Set(children.map((c) => c.id));
   // Дети из других групп, пришедшие на это занятие отработать/доп. занятием — добавлены через /trainer/workoffs
@@ -231,6 +240,11 @@ export default async function AttendanceGroupPage({
                         {child.lastName} {child.firstName}
                       </p>
                       <p className="text-xs text-brand-text/50">{paymentLabel(child.paidUntil)}</p>
+                      {notifiedChildIds.has(child.id) && (
+                        <Badge tone="amber" className="mt-1">
+                          Родитель предупредил
+                        </Badge>
+                      )}
                     </div>
                     {isLockedToOtherTrainer ? (
                       <Badge tone="neutral">

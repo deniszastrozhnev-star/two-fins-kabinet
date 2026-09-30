@@ -2,7 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { requireParentFamily } from "@/lib/auth";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
-import { formatDateRu } from "@/lib/dates";
+import { formatDateRu, parseDateInputValue } from "@/lib/dates";
+import { isTodaysSessionUpcoming, todayNskDateInputValue } from "@/lib/sessionTiming";
+import { computeCombinedPrice } from "@/lib/registrationTariffs";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -12,6 +14,9 @@ import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificate
 import { ContractUpload } from "@/components/parent/ContractUpload";
 import { FamilySummaryCard } from "@/components/parent/FamilySummaryCard";
 import { UnseenEventBanner } from "@/components/parent/UnseenEventBanner";
+import { TodayAbsenceButton } from "@/components/parent/TodayAbsenceButton";
+import { ParentGroupChangeForm } from "@/components/parent/ParentGroupChangeForm";
+import type { ChildGroupOption } from "@/components/shared/GroupPicker";
 
 // Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
 // перекодирует в JPEG) — на Vercel по умолчанию Server Action может упереться
@@ -24,49 +29,83 @@ const SBP_LINK =
 
 export default async function ParentOverviewPage() {
   const { child, siblings } = await requireParentFamily();
-  const [payment, latestCertificate, latestContract, latestEvent, familyRows] = await Promise.all([
-    Promise.resolve(getPaymentStatus(child.paidUntil)),
-    prisma.medicalCertificate.findFirst({
-      where: { childId: child.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.contractDocument.findFirst({
-      where: { childId: child.id },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.event.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { title: true, description: true, createdAt: true },
-    }),
-    siblings.length > 1
-      ? Promise.all(
-          siblings.map(async (s) => {
-            const [cert, contract] = await Promise.all([
-              prisma.medicalCertificate.findFirst({
-                where: { childId: s.id },
-                orderBy: { createdAt: "desc" },
-                select: { validUntil: true },
-              }),
-              prisma.contractDocument.findFirst({
-                where: { childId: s.id },
-                select: { id: true },
-              }),
-            ]);
-            return {
-              id: s.id,
-              name: `${s.lastName} ${s.firstName}`,
-              isActive: s.id === child.id,
-              payment: getPaymentStatus(s.paidUntil),
-              medical: getMedicalStatus(cert?.validUntil ?? null),
-              contractUploaded: contract != null,
-            };
-          }),
-        )
-      : Promise.resolve([]),
-  ]);
+  const [payment, latestCertificate, latestContract, latestEvent, familyRows, groups, currentExtra, todaysNotice] =
+    await Promise.all([
+      Promise.resolve(getPaymentStatus(child.paidUntil)),
+      prisma.medicalCertificate.findFirst({
+        where: { childId: child.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.contractDocument.findFirst({
+        where: { childId: child.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.event.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { title: true, description: true, createdAt: true },
+      }),
+      siblings.length > 1
+        ? Promise.all(
+            siblings.map(async (s) => {
+              const [cert, contract] = await Promise.all([
+                prisma.medicalCertificate.findFirst({
+                  where: { childId: s.id },
+                  orderBy: { createdAt: "desc" },
+                  select: { validUntil: true },
+                }),
+                prisma.contractDocument.findFirst({
+                  where: { childId: s.id },
+                  select: { id: true },
+                }),
+              ]);
+              return {
+                id: s.id,
+                name: `${s.lastName} ${s.firstName}`,
+                isActive: s.id === child.id,
+                payment: getPaymentStatus(s.paidUntil),
+                medical: getMedicalStatus(cert?.validUntil ?? null),
+                contractUploaded: contract != null,
+              };
+            }),
+          )
+        : Promise.resolve([]),
+      prisma.group.findMany({
+        orderBy: [{ level: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          level: true,
+          pool: true,
+          time: true,
+          pricePerMonth: true,
+          daysOfWeek: true,
+        },
+      }),
+      prisma.extraSessionEntitlement.findFirst({
+        where: { childId: child.id },
+        select: { groupId: true, group: { select: { pool: true, pricePerMonth: true, daysOfWeek: true } } },
+      }),
+      child.groupId
+        ? prisma.parentAbsenceNotice.findUnique({
+            where: {
+              childId_groupId_date: {
+                childId: child.id,
+                groupId: child.groupId,
+                date: parseDateInputValue(todayNskDateInputValue()),
+              },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
   const isEventUnseen =
     latestEvent != null && (!child.lastSeenEventsAt || latestEvent.createdAt > child.lastSeenEventsAt);
+
+  const currentPrice = child.group
+    ? computeCombinedPrice(child.group, currentExtra?.group ?? null)
+    : null;
+  const canNotifyAbsenceToday = child.group != null && isTodaysSessionUpcoming(child.group);
 
   return (
     <>
@@ -122,6 +161,26 @@ export default async function ParentOverviewPage() {
                 Группа пока не назначена — уточните у тренера
               </p>
             )}
+
+            {(canNotifyAbsenceToday || todaysNotice != null) && (
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <TodayAbsenceButton alreadyNotified={todaysNotice != null} />
+              </div>
+            )}
+
+            <details className="mt-4 border-t border-white/10 pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-brand-cyan">
+                Сменить группу
+              </summary>
+              <div className="mt-3">
+                <ParentGroupChangeForm
+                  groups={groups as ChildGroupOption[]}
+                  currentGroupId={child.groupId}
+                  currentExtraGroupId={currentExtra?.groupId ?? null}
+                  currentPrice={currentPrice}
+                />
+              </div>
+            </details>
           </CardBody>
         </Card>
 

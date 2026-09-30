@@ -63,6 +63,7 @@ model Group {
   waitlist                 GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
   trainers                 Trainer[]                 @relation("TrainerGroups")
+  parentAbsenceNotices     ParentAbsenceNotice[]
 }
 
 enum ChildStatus {
@@ -102,6 +103,7 @@ model Child {
   paymentRemindersSent     PaymentReminderSent[]
   medicalRemindersSent     MedicalReminderSent[]
   birthdayGreetingsSent    BirthdayGreetingSent[]
+  parentAbsenceNotices     ParentAbsenceNotice[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -144,6 +146,26 @@ enum AttendanceStatus {
   ABSENT
   WORKOFF
   EXTRA // "Допзанятие" — ребёнок пришёл в чужую группу доп. занятием (не отработка)
+}
+
+// Родитель заранее предупредил "сегодня не придём" (до начала занятия, из
+// кабинета) — отдельная от AttendanceRecord сущность, не отметка тренера:
+// markedByTrainerId там NOT NULL и участвует в расчёте зарплаты, а здесь
+// трenера вообще не было. Даёт право на отработку сразу же (см.
+// getWorkoffBalance) — если тренер позже всё равно сам отметит реальную
+// посещаемость на этот же день/группу, именно она в приоритете при подсчёте
+// остатка (см. комментарий в lib/workoffs.ts), чтобы не начислить дважды.
+model ParentAbsenceNotice {
+  id        String   @id @default(cuid())
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@unique([childId, groupId, date])
+  @@index([groupId, date])
 }
 
 model AttendanceRecord {
