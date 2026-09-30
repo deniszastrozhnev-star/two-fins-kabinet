@@ -54,10 +54,17 @@ export default async function ChildrenPage() {
   const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
   const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
-  const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
+  const [balances, unviewedReceipts, unresolvedReceipts, certificates, contracts] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
+      select: { childId: true },
+    }),
+    // Чек загружен, но тренер ещё не выбрал вариант продления (кнопки в
+    // ReceiptTariffPrompt) — это высший приоритет в списке, даже если чек уже
+    // открывали (viewedAt не пуст): работа с ним всё равно не завершена.
+    prisma.paymentReceipt.findMany({
+      where: { childId: { in: children.map((c) => c.id) }, resolvedAt: null },
       select: { childId: true },
     }),
     prisma.medicalCertificate.findMany({
@@ -71,6 +78,7 @@ export default async function ChildrenPage() {
     }),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
+  const childrenWithUnresolvedReceipt = new Set(unresolvedReceipts.map((r) => r.childId));
   const latestValidUntilByChild = new Map<string, Date>();
   for (const cert of certificates) {
     if (!latestValidUntilByChild.has(cert.childId)) {
@@ -85,10 +93,17 @@ export default async function ChildrenPage() {
     const contractOk = childrenWithContract.has(child.id);
     const paymentOk = payment.tone === "green";
     const medicalOk = medical.tone === "green";
+    const hasUnresolvedReceipt = childrenWithUnresolvedReceipt.has(child.id);
     const hasIssue = !paymentOk || !medicalOk || !contractOk;
-    return { child, payment, medical, paymentOk, medicalOk, contractOk, hasIssue };
+    return { child, payment, medical, paymentOk, medicalOk, contractOk, hasUnresolvedReceipt, hasIssue };
   });
+  // 1) непроверенный чек (ждёт решения тренера) — выше даже "красных" статусов,
+  // это разовое действие, а не постоянная проблема; 2) прочие проблемы; 3) всё
+  // в порядке — по алфавиту.
   enrichedChildren.sort((a, b) => {
+    if (a.hasUnresolvedReceipt !== b.hasUnresolvedReceipt) {
+      return a.hasUnresolvedReceipt ? -1 : 1;
+    }
     if (a.hasIssue !== b.hasIssue) return a.hasIssue ? -1 : 1;
     const lastNameCmp = a.child.lastName.localeCompare(b.child.lastName, "ru");
     if (lastNameCmp !== 0) return lastNameCmp;
