@@ -23,9 +23,10 @@ model Trainer {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  attendanceRecords AttendanceRecord[]
-  personalTrainings PersonalTraining[]
-  groups            Group[]            @relation("TrainerGroups")
+  attendanceRecords   AttendanceRecord[]
+  personalTrainings   PersonalTraining[]
+  groups              Group[]             @relation("TrainerGroups")
+  broadcastPushesSent BroadcastPushSent[]
 }
 
 enum GroupLevel {
@@ -553,6 +554,21 @@ model PushSubscription {
   createdAt   DateTime @default(now())
 
   @@index([parentPhone])
+}
+
+// История ручных рассылок push всем родителям (кнопка "Отправить всем
+// родителям" на /trainer/settings) — только для просмотра позже, кто и что
+// отправлял; recipientCount — сколько семей реально имели подписку на момент
+// отправки (не все родители её включали).
+model BroadcastPushSent {
+  id              String   @id @default(cuid())
+  text            String
+  recipientCount  Int
+  sentByTrainerId String
+  sentByTrainer   Trainer  @relation(fields: [sentByTrainerId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([sentByTrainerId])
 }
 
 enum PaymentReminderKind {

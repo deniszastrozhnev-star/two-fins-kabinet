@@ -74,6 +74,17 @@ export async function broadcastPush(payload: PushPayload): Promise<void> {
   await sendToSubscriptions(webpush, subs, payload);
 }
 
+/** Сколько семей реально получат широковещательный push прямо сейчас — у
+ * одной семьи может быть несколько подписок (разные устройства), считаем по
+ * уникальному parentPhone, а не по числу подписок. */
+export async function countActiveSubscriberFamilies(): Promise<number> {
+  const rows = await prisma.pushSubscription.findMany({
+    select: { parentPhone: true },
+    distinct: ["parentPhone"],
+  });
+  return rows.length;
+}
+
 /** Push подпискам одной семьи (по телефону — см. схему PushSubscription: у
  * родителя может быть несколько детей и несколько устройств, подписка
  * привязана к семье целиком, а не к конкретному ребёнку). Тихо no-op, если
