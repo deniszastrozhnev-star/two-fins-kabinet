@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { get } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
+import { contentDispositionHeader } from "@/lib/contentDisposition";
 
 /** Отдаёт файл медицинской справки (приватный blob) только авторизованному тренеру. */
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
   return new NextResponse(result.stream, {
     headers: {
       "Content-Type": result.blob.contentType ?? "application/octet-stream",
-      "Content-Disposition": `inline; filename="${certificate.fileUrl.split("/").pop()}"`,
+      "Content-Disposition": contentDispositionHeader(certificate.fileUrl.split("/").pop() ?? "certificate"),
     },
   });
 }
