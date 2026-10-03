@@ -32,6 +32,16 @@ export function getReportPeriod(startYear: number, startMonth0: number): ReportP
   };
 }
 
+/** Границы периода как моменты времени (для полей с временем, вроде paidAt):
+ * [gte, lt) — с полуночи 25-го по Новосибирску до полуночи 25-го следующего. */
+export function reportPeriodInstantRange(period: ReportPeriod): { gte: Date; lt: Date } {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  return {
+    gte: new Date(period.start.getTime() - NOVOSIBIRSK_OFFSET_MS),
+    lt: new Date(period.end.getTime() + DAY_MS - NOVOSIBIRSK_OFFSET_MS),
+  };
+}
+
 /** Текущий период: если сегодня (по Новосибирску) 25-е или позже — начался
  * 25-го этого месяца, иначе — 25-го прошлого. */
 export function getCurrentReportPeriod(): ReportPeriod {

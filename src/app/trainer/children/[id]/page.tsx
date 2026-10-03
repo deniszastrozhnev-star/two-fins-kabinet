@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { getWorkoffBalance } from "@/lib/workoffs";
+import { getChildTariffRub } from "@/lib/payments";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatDateRu } from "@/lib/dates";
@@ -97,6 +98,7 @@ export default async function ChildDetailPage({
   ]);
 
   const payment = getPaymentStatus(child.paidUntil);
+  const tariffRub = await getChildTariffRub(child.id);
   const medicalStatus = getMedicalStatus(certificates[0]?.validUntil ?? null);
 
   return (
@@ -237,7 +239,7 @@ export default async function ChildDetailPage({
                           </a>
                         </div>
                         {!r.resolvedAt && (
-                          <ReceiptTariffPrompt receiptId={r.id} childId={child.id} />
+                          <ReceiptTariffPrompt receiptId={r.id} childId={child.id} tariffRub={tariffRub} />
                         )}
                       </li>
                     );

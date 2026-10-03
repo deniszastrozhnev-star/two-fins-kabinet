@@ -8,6 +8,7 @@ import { requireParentChild, requireTrainer } from "@/lib/auth";
 import { resizeForUpload } from "@/lib/image";
 import { parseDateInputValue } from "@/lib/dates";
 import { sendPaymentAcceptedPush } from "@/lib/push";
+import { recordPaymentConfirmation } from "@/lib/payments";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
@@ -64,7 +65,7 @@ export async function markLatestReceiptViewed(childId: string) {
 
 /** Тренер подтверждает чек по тарифу — продлеваем до конца текущего месяца. */
 export async function confirmReceiptTariffAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const receiptId = String(formData.get("receiptId") ?? "");
   const childId = String(formData.get("childId") ?? "");
   if (!receiptId || !childId) throw new Error("Не найден чек");
@@ -80,6 +81,7 @@ export async function confirmReceiptTariffAction(formData: FormData) {
       data: { resolvedAt: new Date() },
     }),
   ]);
+  await recordPaymentConfirmation({ childId, paidUntil, source: "RECEIPT_TARIFF", trainerId: trainer.id });
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${childId}`);
@@ -92,12 +94,18 @@ export async function confirmReceiptTariffAction(formData: FormData) {
 
 /** Тренер указывает дату оплаты вручную (доплата, нестандартный случай). */
 export async function manualReceiptResolutionAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const receiptId = String(formData.get("receiptId") ?? "");
   const childId = String(formData.get("childId") ?? "");
   const dateStr = String(formData.get("paidUntil") ?? "");
   if (!receiptId || !childId || !dateStr) {
     throw new Error("Укажите дату оплаты");
+  }
+  // Сумма вводится вручную (доплата/нестандартный случай); пусто — берётся тариф ребёнка.
+  const amountRaw = String(formData.get("amountRub") ?? "").trim();
+  const amountRub = amountRaw ? Math.round(Number(amountRaw)) : undefined;
+  if (amountRub !== undefined && (!Number.isFinite(amountRub) || amountRub < 0)) {
+    throw new Error("Некорректная сумма оплаты");
   }
 
   const paidUntil = parseDateInputValue(dateStr);
@@ -111,6 +119,13 @@ export async function manualReceiptResolutionAction(formData: FormData) {
       data: { resolvedAt: new Date() },
     }),
   ]);
+  await recordPaymentConfirmation({
+    childId,
+    paidUntil,
+    source: "RECEIPT_MANUAL",
+    trainerId: trainer.id,
+    amountRub,
+  });
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${childId}`);

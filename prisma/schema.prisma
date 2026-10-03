@@ -23,10 +23,11 @@ model Trainer {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  attendanceRecords   AttendanceRecord[]
-  personalTrainings   PersonalTraining[]
-  groups              Group[]             @relation("TrainerGroups")
-  broadcastPushesSent BroadcastPushSent[]
+  attendanceRecords    AttendanceRecord[]
+  personalTrainings    PersonalTraining[]
+  groups               Group[]               @relation("TrainerGroups")
+  broadcastPushesSent  BroadcastPushSent[]
+  paymentConfirmations PaymentConfirmation[]
 }
 
 enum GroupLevel {
@@ -105,6 +106,7 @@ model Child {
   medicalRemindersSent     MedicalReminderSent[]
   birthdayGreetingsSent    BirthdayGreetingSent[]
   parentAbsenceNotices     ParentAbsenceNotice[]
+  paymentConfirmations     PaymentConfirmation[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -556,6 +558,36 @@ model PushSubscription {
   @@index([parentPhone])
 }
 
+enum PaymentConfirmationSource {
+  RECEIPT_TARIFF // чек подтверждён кнопкой «Продлить по тарифу»
+  RECEIPT_MANUAL // чек подтверждён с ручной датой/суммой
+  MARK_PAID // кнопка «Оплачено» в карточке ребёнка
+  DATE_EDIT // тренер сдвинул «Оплачено до» вперёд в карточке ребёнка
+}
+
+// Факт подтверждённой оплаты — сумма записывается в момент, когда тренер
+// подтверждает оплату (раньше сохранялась только дата paidUntil, поэтому
+// выручку за прошлые периоды посчитать было нельзя). amountRub — тариф
+// ребёнка на момент подтверждения либо сумма, введённая тренером вручную;
+// null — если суммы не было (нет группы/тарифа). Уникальность по
+// (childId, paidUntil): повторное подтверждение того же срока не задваивает
+// оплату. Связи с ребёнком и тренером — SetNull, чтобы удаление ребёнка или
+// тренера не стирало прошлую выручку.
+model PaymentConfirmation {
+  id                   String                    @id @default(cuid())
+  childId              String?
+  child                Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
+  amountRub            Int?
+  paidUntil            DateTime                  @db.Date
+  source               PaymentConfirmationSource
+  confirmedByTrainerId String?
+  confirmedByTrainer   Trainer?                  @relation(fields: [confirmedByTrainerId], references: [id], onDelete: SetNull)
+  paidAt               DateTime                  @default(now())
+
+  @@unique([childId, paidUntil])
+  @@index([paidAt])
+}
+
 // История ручных рассылок push всем родителям (кнопка "Отправить всем
 // родителям" на /trainer/settings) — только для просмотра позже, кто и что
 // отправлял; recipientCount — сколько семей реально имели подписку на момент
@@ -628,9 +660,9 @@ model MedicalReminderSent {
 // календарный год отправки, а не год рождения), чтобы не задублировать при
 // повторном суточном тике/ручном запуске в тот же день.
 model BirthdayGreetingSent {
-  id      String @id @default(cuid())
+  id      String   @id @default(cuid())
   childId String
-  child   Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
   year    Int
   sentAt  DateTime @default(now())
 
@@ -641,7 +673,7 @@ model BirthdayGreetingSent {
 // Единственная строка общих настроек приложения — тот же singleton-паттерн,
 // что и FinanceSettings, но для не-финансовых переключателей.
 model AppSettings {
-  id                     String   @id @default("singleton")
-  sendBirthdayGreetings  Boolean  @default(false)
-  updatedAt              DateTime @updatedAt
+  id                    String   @id @default("singleton")
+  sendBirthdayGreetings Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
 }

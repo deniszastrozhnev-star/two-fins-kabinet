@@ -6,8 +6,10 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { getFinanceSettings } from "@/lib/financeSettings";
 import { computeSalaryReport } from "@/lib/salary";
 import { MonthlyRentForm } from "@/components/trainer/MonthlyRentForm";
+import { formatDateRu } from "@/lib/dates";
 import {
   getCurrentReportPeriod,
+  reportPeriodInstantRange,
   reportPeriodForDate,
   reportPeriodFromKey,
   shiftReportPeriodKey,
@@ -42,14 +44,31 @@ export default async function MetricsPage({
   const periodHref = (key: string) =>
     key === currentPeriod.key ? "/trainer/metrics" : `/trainer/metrics?period=${key}`;
 
-  const [groups, financeSettings, salaryRows] = await Promise.all([
+  const instantRange = reportPeriodInstantRange(period);
+  const [groups, financeSettings, salaryRows, paymentsInPeriod, firstConfirmation] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
       include: { _count: { select: { children: true } } },
     }),
     getFinanceSettings(),
     computeSalaryReport(period.start, period.end),
+    prisma.paymentConfirmation.aggregate({
+      where: { paidAt: instantRange },
+      _sum: { amountRub: true },
+      _count: { _all: true, amountRub: true },
+    }),
+    prisma.paymentConfirmation.aggregate({ _min: { paidAt: true } }),
   ]);
+
+  // Фактическая выручка — сумма подтверждённых оплат за период (сумма
+  // записывается в момент подтверждения, см. lib/payments.ts). Достоверна,
+  // только если учёт уже шёл к началу периода; до этого (и в период запуска
+  // учёта) выручка — оценка по текущему составу групп.
+  const trackingStart = firstConfirmation._min.paidAt;
+  const hasFactRevenue = trackingStart != null && trackingStart.getTime() <= instantRange.gte.getTime();
+  const factRevenue = paymentsInPeriod._sum.amountRub ?? 0;
+  const paymentsCount = paymentsInPeriod._count._all;
+  const paymentsWithoutAmount = paymentsCount - paymentsInPeriod._count.amountRub;
 
   const rows = groups.map((g) => ({
     id: g.id,
@@ -62,7 +81,8 @@ export default async function MetricsPage({
       g.pricePerMonth != null ? g._count.children * g.pricePerMonth : null,
   }));
 
-  const totalRevenue = rows.reduce((sum, r) => sum + (r.revenue ?? 0), 0);
+  const estimatedRevenue = rows.reduce((sum, r) => sum + (r.revenue ?? 0), 0);
+  const totalRevenue = hasFactRevenue ? factRevenue : estimatedRevenue;
 
   const monthlyRentRub = financeSettings.monthlyRentRub;
   const trainerSalariesTotal = salaryRows.reduce((sum, r) => sum + r.total, 0);
@@ -105,12 +125,20 @@ export default async function MetricsPage({
         )}
       </div>
 
-      {!isCurrent && (
+      {!hasFactRevenue && !isCurrent && (
         <p className="mb-6 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           Зарплаты за этот период посчитаны точно — по записям посещаемости и
-          персональным тренировкам. Состав групп и тарифы на прошлые даты не
-          хранятся, поэтому заполняемость, выручка и прибыль ниже — оценка по
-          текущему составу групп и текущей аренде.
+          персональным тренировкам. Суммы оплат до{" "}
+          {trackingStart ? formatDateRu(trackingStart) : "начала учёта"} не
+          записывались, а состав групп на прошлые даты не хранится, поэтому
+          выручка и прибыль ниже — оценка по текущему составу групп и текущей
+          аренде.
+        </p>
+      )}
+      {hasFactRevenue && !isCurrent && (
+        <p className="mb-6 rounded-lg bg-white/5 px-4 py-3 text-sm text-brand-text/70">
+          Оборот — фактическая сумма оплат, подтверждённых в этом периоде;
+          зарплаты посчитаны по записям посещаемости. Аренда — текущая.
         </p>
       )}
 
@@ -169,7 +197,23 @@ export default async function MetricsPage({
       <Card className="mb-6">
         <CardBody className="flex flex-col divide-y divide-white/10 p-0">
           <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-            <p className="text-sm text-brand-text/70">Оборот (оценка)</p>
+            <div>
+              <p className="text-sm text-brand-text/70">
+                {hasFactRevenue ? "Оборот (факт: подтверждённые оплаты)" : "Оборот (оценка)"}
+              </p>
+              {hasFactRevenue && paymentsWithoutAmount > 0 && (
+                <p className="mt-1 text-xs text-amber-200/80">
+                  Ещё {paymentsWithoutAmount} оплат подтверждено без суммы (у ребёнка не было тарифа) — в оборот не вошли
+                </p>
+              )}
+              {!hasFactRevenue && paymentsCount > 0 && (
+                <p className="mt-1 text-xs text-brand-text/50">
+                  Учёт сумм оплат ведётся с {trackingStart ? formatDateRu(trackingStart) : "—"}: подтверждено{" "}
+                  {paymentsCount} оплат на {factRevenue.toLocaleString("ru-RU")}₽ — со следующего периода оборот
+                  станет фактическим
+                </p>
+              )}
+            </div>
             <p className="font-heading text-xl font-bold">
               {totalRevenue.toLocaleString("ru-RU")}₽
             </p>

@@ -9,6 +9,7 @@ import { normalizePhone } from "@/lib/phone";
 import { parseDateInputValue } from "@/lib/dates";
 import { assignOrWaitlist } from "@/lib/waitlist";
 import { sendPaymentAcceptedPush } from "@/lib/push";
+import { recordPaymentConfirmation } from "@/lib/payments";
 
 function readChildFields(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
@@ -61,7 +62,7 @@ export async function updateChildAction(
   _prevState: ChildFormState,
   formData: FormData,
 ): Promise<ChildFormState> {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Не найден ребёнок");
   const existing = await prisma.child.findUnique({
@@ -87,6 +88,20 @@ export async function updateChildAction(
 
   const paidUntilChanged =
     (existing?.paidUntil?.getTime() ?? null) !== (data.paidUntil?.getTime() ?? null);
+  // Оплатой считаем только сдвиг даты ВПЕРЁД — откат или правка опечатки
+  // выручку не меняют (в отличие от push, который уходит при любом изменении).
+  if (
+    paidUntilChanged &&
+    data.paidUntil &&
+    (!existing?.paidUntil || data.paidUntil.getTime() > existing.paidUntil.getTime())
+  ) {
+    await recordPaymentConfirmation({
+      childId: id,
+      paidUntil: data.paidUntil,
+      source: "DATE_EDIT",
+      trainerId: trainer.id,
+    });
+  }
   if (paidUntilChanged && data.paidUntil) {
     await sendPaymentAcceptedPush(updated, data.paidUntil).catch((err) =>
       console.error("updateChildAction: push failed", err),
@@ -97,7 +112,7 @@ export async function updateChildAction(
 }
 
 export async function markPaidAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Не найден ребёнок");
   const paidUntil = endOfMonth(new Date());
@@ -105,6 +120,7 @@ export async function markPaidAction(formData: FormData) {
     where: { id },
     data: { paidUntil },
   });
+  await recordPaymentConfirmation({ childId: id, paidUntil, source: "MARK_PAID", trainerId: trainer.id });
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${id}`);
   revalidatePath("/parent", "layout");
