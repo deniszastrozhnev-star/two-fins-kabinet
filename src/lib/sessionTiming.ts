@@ -31,7 +31,8 @@ export function nextUpcomingSession(
   group: { daysOfWeek: string[]; time: string },
 ): { dateInputValue: string; weekday: string } | null {
   const now = nowInNovosibirsk();
-  const match = group.time.match(/(\d{1,2}):(\d{2})/);
+  // Тренеры пишут время и через двоеточие ("17:00"), и через точку ("12.00").
+  const match = group.time.match(/(\d{1,2})[:.](\d{2})/);
   const startMinutes = match ? Number(match[1]) * 60 + Number(match[2]) : null;
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
 
