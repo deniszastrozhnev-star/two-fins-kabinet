@@ -1,4 +1,4 @@
-import { requireHeadTrainer } from "@/lib/auth";
+import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
 import { computeSalaryReport, GROUP_LESSON_RATE, PERSONAL_TRAINING_RATE } from "@/lib/salary";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -12,7 +12,8 @@ export default async function ReportPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  await requireHeadTrainer();
+  const trainer = await requireTrainer();
+  const isHead = trainer.role === "HEAD";
   const params = await searchParams;
 
   const fromStr = params.from ?? toDateInputValue(startOfMonth(new Date()));
@@ -20,14 +21,22 @@ export default async function ReportPage({
   const dateFrom = parseDateInputValue(fromStr);
   const dateTo = parseDateInputValue(toStr);
 
-  const rows = await computeSalaryReport(dateFrom, dateTo);
-  const grandTotal = rows.reduce((sum, r) => sum + r.total, 0);
+  // Обычный тренер видит только себя и только количество занятий — денежные
+  // суммы (и ставки, из которых их можно восстановить) в разметку не попадают
+  // вовсе; полный отчёт по всем тренерам с суммами — только у главного.
+  const allRows = await computeSalaryReport(dateFrom, dateTo);
+  const rows = isHead ? allRows : allRows.filter((r) => r.trainerId === trainer.id);
+  const grandTotal = allRows.reduce((sum, r) => sum + r.total, 0);
 
   return (
     <>
       <PageHeader
-        title="Отчёт"
-        description={`Групповые занятия — ${GROUP_LESSON_RATE}₽/ребёнок, персональные тренировки — ${PERSONAL_TRAINING_RATE}₽`}
+        title={isHead ? "Отчёт" : "Мой отчёт"}
+        description={
+          isHead
+            ? `Групповые занятия — ${GROUP_LESSON_RATE}₽/ребёнок, персональные тренировки — ${PERSONAL_TRAINING_RATE}₽`
+            : "Сколько детей отмечено на групповых занятиях и сколько проведено персональных тренировок за период"
+        }
       />
 
       <Card className="mb-6 max-w-lg">
@@ -50,15 +59,15 @@ export default async function ReportPage({
 
       <Card className="overflow-x-auto">
         <CardBody className="p-0">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className={`w-full text-sm ${isHead ? "min-w-[640px]" : "min-w-[320px]"}`}>
             <thead>
               <tr className="border-b border-white/10 text-left text-brand-text/60">
                 <th className="px-4 py-3 font-medium sm:px-5">Тренер</th>
                 <th className="px-4 py-3 font-medium sm:px-5">Групповых</th>
-                <th className="px-4 py-3 font-medium sm:px-5">За группы</th>
+                {isHead && <th className="px-4 py-3 font-medium sm:px-5">За группы</th>}
                 <th className="px-4 py-3 font-medium sm:px-5">Персональных</th>
-                <th className="px-4 py-3 font-medium sm:px-5">За персональные</th>
-                <th className="px-4 py-3 font-medium sm:px-5">Итого</th>
+                {isHead && <th className="px-4 py-3 font-medium sm:px-5">За персональные</th>}
+                {isHead && <th className="px-4 py-3 font-medium sm:px-5">Итого</th>}
               </tr>
             </thead>
             <tbody>
@@ -66,25 +75,33 @@ export default async function ReportPage({
                 <tr key={r.trainerId} className="border-b border-white/5">
                   <td className="px-4 py-3 font-medium sm:px-5">{r.username}</td>
                   <td className="px-4 py-3 sm:px-5">{r.groupCount}</td>
-                  <td className="px-4 py-3 sm:px-5">{r.groupTotal.toLocaleString("ru-RU")}₽</td>
+                  {isHead && (
+                    <td className="px-4 py-3 sm:px-5">{r.groupTotal.toLocaleString("ru-RU")}₽</td>
+                  )}
                   <td className="px-4 py-3 sm:px-5">{r.personalCount}</td>
-                  <td className="px-4 py-3 sm:px-5">{r.personalTotal.toLocaleString("ru-RU")}₽</td>
-                  <td className="px-4 py-3 font-semibold text-brand-cyan sm:px-5">
-                    {r.total.toLocaleString("ru-RU")}₽
-                  </td>
+                  {isHead && (
+                    <td className="px-4 py-3 sm:px-5">{r.personalTotal.toLocaleString("ru-RU")}₽</td>
+                  )}
+                  {isHead && (
+                    <td className="px-4 py-3 font-semibold text-brand-cyan sm:px-5">
+                      {r.total.toLocaleString("ru-RU")}₽
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr>
-                <td className="px-4 py-3 font-heading font-bold sm:px-5" colSpan={5}>
-                  Всего
-                </td>
-                <td className="px-4 py-3 font-heading font-bold text-brand-cyan sm:px-5">
-                  {grandTotal.toLocaleString("ru-RU")}₽
-                </td>
-              </tr>
-            </tfoot>
+            {isHead && (
+              <tfoot>
+                <tr>
+                  <td className="px-4 py-3 font-heading font-bold sm:px-5" colSpan={5}>
+                    Всего
+                  </td>
+                  <td className="px-4 py-3 font-heading font-bold text-brand-cyan sm:px-5">
+                    {grandTotal.toLocaleString("ru-RU")}₽
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </CardBody>
       </Card>

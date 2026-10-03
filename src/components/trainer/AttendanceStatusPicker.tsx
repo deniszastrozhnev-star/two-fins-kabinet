@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AttendanceStatus } from "@prisma/client";
+import { useAttendanceStatuses } from "@/components/trainer/AttendanceProgress";
 
 const OPTIONS: { value: AttendanceStatus; label: string; on: string }[] = [
   {
@@ -25,14 +26,23 @@ const OPTIONS: { value: AttendanceStatus; label: string; on: string }[] = [
  * скрытом поле формы — сервер удаляет запись, а не подставляет "Не пришёл"). */
 export function AttendanceStatusPicker({
   name,
+  childId,
   defaultValue,
   hasCourseResult,
 }: {
   name: string;
+  childId: string;
   defaultValue?: AttendanceStatus;
   hasCourseResult?: boolean;
 }) {
   const [value, setValue] = useState<AttendanceStatus | null>(defaultValue ?? null);
+  const progress = useAttendanceStatuses();
+
+  function toggle(next: AttendanceStatus) {
+    const result = value === next ? null : next;
+    setValue(result);
+    progress?.setStatus(childId, result);
+  }
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -42,7 +52,7 @@ export function AttendanceStatusPicker({
           <button
             key={opt.value}
             type="button"
-            onClick={() => setValue((v) => (v === opt.value ? null : opt.value))}
+            onClick={() => toggle(opt.value)}
             className={`rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-brand-text/60 transition ${
               value === opt.value ? opt.on : ""
             }`}

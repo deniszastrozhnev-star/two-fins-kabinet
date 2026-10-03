@@ -7,29 +7,40 @@ function nowInNovosibirsk(): Date {
   return new Date(Date.now() + NOVOSIBIRSK_OFFSET_MS);
 }
 
-/** Сегодняшняя дата по Новосибирску в формате YYYY-MM-DD (для parseDateInputValue). */
-export function todayNskDateInputValue(): string {
-  const now = nowInNovosibirsk();
-  const yyyy = now.getUTCFullYear();
-  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(now.getUTCDate()).padStart(2, "0");
+function toDateInputValueUtc(d: Date): string {
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/**
- * Есть ли у группы занятие сегодня (по Новосибирску) и не началось ли оно ещё.
- * Время группы — свободный текст тренера ("17:00–17:45", иногда с другим
- * разделителем), поэтому берём просто первое HH:MM в строке, не полагаясь на
- * конкретный символ-разделитель.
- */
-export function isTodaysSessionUpcoming(group: { daysOfWeek: string[]; time: string }): boolean {
-  const now = nowInNovosibirsk();
-  const todayLabel = WEEKDAYS[(now.getUTCDay() + 6) % 7];
-  if (!group.daysOfWeek.includes(todayLabel)) return false;
+/** Сегодняшняя дата по Новосибирску в формате YYYY-MM-DD (для parseDateInputValue). */
+export function todayNskDateInputValue(): string {
+  return toDateInputValueUtc(nowInNovosibirsk());
+}
 
+/**
+ * Ближайшее ещё не начавшееся занятие группы (по Новосибирску): сегодня, если
+ * сегодня есть занятие и оно не началось, иначе первый следующий день из
+ * расписания. Время группы — свободный текст тренера ("17:00–17:45", иногда с
+ * другим разделителем), поэтому берём просто первое HH:MM в строке. Если
+ * времени не разобрать — сегодняшний день пропускаем (нельзя понять, началось
+ * ли занятие), берём следующий. null — если в расписании нет ни одного дня.
+ */
+export function nextUpcomingSession(
+  group: { daysOfWeek: string[]; time: string },
+): { dateInputValue: string; weekday: string } | null {
+  const now = nowInNovosibirsk();
   const match = group.time.match(/(\d{1,2}):(\d{2})/);
-  if (!match) return false;
-  const startMinutes = Number(match[1]) * 60 + Number(match[2]);
+  const startMinutes = match ? Number(match[1]) * 60 + Number(match[2]) : null;
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  return nowMinutes < startMinutes;
+
+  for (let offset = 0; offset <= 7; offset++) {
+    const day = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+    const weekday = WEEKDAYS[(day.getUTCDay() + 6) % 7];
+    if (!group.daysOfWeek.includes(weekday)) continue;
+    if (offset === 0 && (startMinutes === null || nowMinutes >= startMinutes)) continue;
+    return { dateInputValue: toDateInputValueUtc(day), weekday };
+  }
+  return null;
 }

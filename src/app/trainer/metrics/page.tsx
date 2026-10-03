@@ -6,12 +6,13 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { getFinanceSettings } from "@/lib/financeSettings";
 import { computeSalaryReport } from "@/lib/salary";
 import { MonthlyRentForm } from "@/components/trainer/MonthlyRentForm";
-import { startOfMonth } from "date-fns";
+import { getCurrentReportPeriod } from "@/lib/reportPeriod";
 
 const REVENUE_GOAL = 300_000;
 
 export default async function MetricsPage() {
   await requireHeadTrainer();
+  const period = getCurrentReportPeriod();
 
   const [groups, financeSettings, salaryRows] = await Promise.all([
     prisma.group.findMany({
@@ -19,7 +20,7 @@ export default async function MetricsPage() {
       include: { _count: { select: { children: true } } },
     }),
     getFinanceSettings(),
-    computeSalaryReport(startOfMonth(new Date()), new Date()),
+    computeSalaryReport(period.start, period.end),
   ]);
 
   const rows = groups.map((g) => ({
@@ -44,7 +45,7 @@ export default async function MetricsPage() {
     <>
       <PageHeader
         title="Показатели"
-        description="Заполняемость и оценочная выручка по группам"
+        description={`Заполняемость и оценочная выручка по группам. Расчётный период: ${period.label} (обнуляется 25-го числа каждого месяца)`}
       />
 
       <Card className="mb-6 overflow-x-auto">
@@ -119,7 +120,7 @@ export default async function MetricsPage() {
             </p>
           </div>
           <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
-            <p className="text-sm text-brand-text/70">− Зарплаты тренерам (с начала месяца)</p>
+            <p className="text-sm text-brand-text/70">− Зарплаты тренерам (за период с {period.startLabel})</p>
             <p className="font-heading text-xl font-bold text-red-300">
               −{trainerSalariesTotal.toLocaleString("ru-RU")}₽
             </p>

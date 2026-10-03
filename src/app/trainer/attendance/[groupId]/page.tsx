@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Field";
 import { AttendanceDateFilter } from "@/components/trainer/AttendanceDateFilter";
 import { AttendanceStatusPicker } from "@/components/trainer/AttendanceStatusPicker";
+import { AttendanceStatusProvider, AttendancePresentCounter } from "@/components/trainer/AttendanceProgress";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 
@@ -158,6 +159,11 @@ export default async function AttendanceGroupPage({
         </CardBody>
       </Card>
 
+      <AttendanceStatusProvider
+        initial={Object.fromEntries(children.map((c) => [c.id, recordByChildId.get(c.id)?.status ?? null]))}
+      >
+      <AttendancePresentCounter />
+
       <Card className="mb-6">
         <CardBody>
           <h2 className="mb-3 font-heading text-lg font-bold">Курсовка</h2>
@@ -254,6 +260,7 @@ export default async function AttendanceGroupPage({
                     ) : (
                       <AttendanceStatusPicker
                         name={`status-${child.id}`}
+                        childId={child.id}
                         defaultValue={record?.status}
                         hasCourseResult={childIdsWithCourseResultToday.has(child.id)}
                       />
@@ -268,6 +275,7 @@ export default async function AttendanceGroupPage({
           </div>
         </form>
       )}
+      </AttendanceStatusProvider>
 
       {workoffVisitors.length > 0 && (
         <div className="mt-6">

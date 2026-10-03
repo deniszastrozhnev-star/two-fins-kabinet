@@ -3,7 +3,7 @@ import { requireParentFamily } from "@/lib/auth";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatDateRu, parseDateInputValue } from "@/lib/dates";
-import { isTodaysSessionUpcoming, todayNskDateInputValue } from "@/lib/sessionTiming";
+import { nextUpcomingSession } from "@/lib/sessionTiming";
 import { computeCombinedPrice } from "@/lib/registrationTariffs";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -29,7 +29,8 @@ const SBP_LINK =
 
 export default async function ParentOverviewPage() {
   const { child, siblings } = await requireParentFamily();
-  const [payment, latestCertificate, latestContract, latestEvent, familyRows, groups, currentExtra, todaysNotice] =
+  const nextSession = child.group ? nextUpcomingSession(child.group) : null;
+  const [payment, latestCertificate, latestContract, latestEvent, familyRows, groups, currentExtra, nextNotice] =
     await Promise.all([
       Promise.resolve(getPaymentStatus(child.paidUntil)),
       prisma.medicalCertificate.findFirst({
@@ -85,13 +86,13 @@ export default async function ParentOverviewPage() {
         where: { childId: child.id },
         select: { groupId: true, group: { select: { pool: true, pricePerMonth: true, daysOfWeek: true } } },
       }),
-      child.groupId
+      child.groupId && nextSession
         ? prisma.parentAbsenceNotice.findUnique({
             where: {
               childId_groupId_date: {
                 childId: child.id,
                 groupId: child.groupId,
-                date: parseDateInputValue(todayNskDateInputValue()),
+                date: parseDateInputValue(nextSession.dateInputValue),
               },
             },
             select: { id: true },
@@ -105,7 +106,9 @@ export default async function ParentOverviewPage() {
   const currentPrice = child.group
     ? computeCombinedPrice(child.group, currentExtra?.group ?? null)
     : null;
-  const canNotifyAbsenceToday = child.group != null && isTodaysSessionUpcoming(child.group);
+  const nextSessionLabel = nextSession
+    ? `${nextSession.weekday}, ${formatDateRu(parseDateInputValue(nextSession.dateInputValue), "d MMMM")}`
+    : null;
 
   return (
     <>
@@ -162,9 +165,13 @@ export default async function ParentOverviewPage() {
               </p>
             )}
 
-            {(canNotifyAbsenceToday || todaysNotice != null) && (
+            {nextSessionLabel && (
               <div className="mt-4 border-t border-white/10 pt-4">
-                <TodayAbsenceButton alreadyNotified={todaysNotice != null} />
+                <TodayAbsenceButton
+                  key={nextSession?.dateInputValue}
+                  alreadyNotified={nextNotice != null}
+                  sessionLabel={nextSessionLabel}
+                />
               </div>
             )}
 
