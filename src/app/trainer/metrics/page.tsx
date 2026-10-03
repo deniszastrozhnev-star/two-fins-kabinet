@@ -6,13 +6,41 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { getFinanceSettings } from "@/lib/financeSettings";
 import { computeSalaryReport } from "@/lib/salary";
 import { MonthlyRentForm } from "@/components/trainer/MonthlyRentForm";
-import { getCurrentReportPeriod } from "@/lib/reportPeriod";
+import {
+  getCurrentReportPeriod,
+  reportPeriodForDate,
+  reportPeriodFromKey,
+  shiftReportPeriodKey,
+} from "@/lib/reportPeriod";
+import Link from "next/link";
 
 const REVENUE_GOAL = 300_000;
 
-export default async function MetricsPage() {
+export default async function MetricsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   await requireHeadTrainer();
-  const period = getCurrentReportPeriod();
+  const { period: periodParam } = await searchParams;
+
+  // Самый ранний период, за который вообще есть записи посещаемости — глубже
+  // назад листать незачем; будущие периоды тоже недоступны.
+  const earliestRecord = await prisma.attendanceRecord.aggregate({ _min: { date: true } });
+  const currentPeriod = getCurrentReportPeriod();
+  const earliestKey = earliestRecord._min.date
+    ? reportPeriodForDate(earliestRecord._min.date).key
+    : currentPeriod.key;
+  const requested = reportPeriodFromKey(periodParam);
+  const period =
+    requested && requested.key >= earliestKey && requested.key <= currentPeriod.key
+      ? requested
+      : currentPeriod;
+  const isCurrent = period.key === currentPeriod.key;
+  const prevKey = period.key > earliestKey ? shiftReportPeriodKey(period.key, -1) : null;
+  const nextKey = period.key < currentPeriod.key ? shiftReportPeriodKey(period.key, 1) : null;
+  const periodHref = (key: string) =>
+    key === currentPeriod.key ? "/trainer/metrics" : `/trainer/metrics?period=${key}`;
 
   const [groups, financeSettings, salaryRows] = await Promise.all([
     prisma.group.findMany({
@@ -45,8 +73,46 @@ export default async function MetricsPage() {
     <>
       <PageHeader
         title="Показатели"
-        description={`Заполняемость и оценочная выручка по группам. Расчётный период: ${period.label} (обнуляется 25-го числа каждого месяца)`}
+        description="Заполняемость и оценочная выручка по группам. Расчётный период начинается 25-го числа каждого месяца"
       />
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        {prevKey ? (
+          <Link
+            href={periodHref(prevKey)}
+            aria-label="Предыдущий период"
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm hover:bg-white/10"
+          >
+            ← Назад
+          </Link>
+        ) : (
+          <span className="rounded-lg border border-white/5 px-3 py-1.5 text-sm text-brand-text/30">← Назад</span>
+        )}
+        <p className="font-heading text-lg font-bold">
+          {period.label}
+          {isCurrent && <span className="ml-2 text-sm font-normal text-brand-cyan">текущий</span>}
+        </p>
+        {nextKey ? (
+          <Link
+            href={periodHref(nextKey)}
+            aria-label="Следующий период"
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm hover:bg-white/10"
+          >
+            Вперёд →
+          </Link>
+        ) : (
+          <span className="rounded-lg border border-white/5 px-3 py-1.5 text-sm text-brand-text/30">Вперёд →</span>
+        )}
+      </div>
+
+      {!isCurrent && (
+        <p className="mb-6 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Зарплаты за этот период посчитаны точно — по записям посещаемости и
+          персональным тренировкам. Состав групп и тарифы на прошлые даты не
+          хранятся, поэтому заполняемость, выручка и прибыль ниже — оценка по
+          текущему составу групп и текущей аренде.
+        </p>
+      )}
 
       <Card className="mb-6 overflow-x-auto">
         <CardBody className="p-0">
