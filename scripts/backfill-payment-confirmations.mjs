@@ -14,7 +14,8 @@
 //   Показать:  DATABASE_URL="..." node scripts/backfill-payment-confirmations.mjs
 //   Записать:  DATABASE_URL="..." node scripts/backfill-payment-confirmations.mjs --apply
 //
-// Параметры: --from=YYYY-MM-DD (по умолчанию 2026-09-25, начало периода),
+// Параметры: --exclude-child=ID[,ID] — не трогать этих детей (тестовых),
+//            --from=YYYY-MM-DD (по умолчанию 2026-09-25, начало периода),
 //            --until=YYYY-MM-DD (по умолчанию — момент первой записи учёта,
 //            чтобы не дублировать то, что уже записано автоматически).
 import crypto from "node:crypto";
@@ -25,6 +26,10 @@ const NSK_OFFSET_MS = 7 * 60 * 60 * 1000;
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const argValue = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+
+// --exclude-child=id1,id2 — не дозаписывать оплаты этих детей (например, тестовых).
+const excludedChildIds = new Set((argValue("exclude-child") ?? "").split(",").filter(Boolean));
+let excludedCount = 0;
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
@@ -71,6 +76,10 @@ const day = (d) => d.toISOString().slice(0, 10);
 const plan = new Map(); // ключ "childId|paidUntil" — один платёж за срок
 let skippedExisting = 0;
 for (const r of receipts.rows) {
+  if (excludedChildIds.has(r.childId)) {
+    excludedCount += 1;
+    continue;
+  }
   const paidUntil = endOfMonthNsk(r.resolvedAt);
   const key = `${r.childId}|${day(paidUntil)}`;
   if (plan.has(key)) continue;
@@ -98,6 +107,7 @@ const rows = [...plan.values()];
 const withAmount = rows.filter((r) => r.amountRub != null);
 console.log(`Период: ${fromDate} … ${untilInstant.toISOString()} (подтверждения чеков)`);
 console.log(`Подтверждённых чеков в периоде: ${receipts.rowCount}`);
+console.log(`Исключено по --exclude-child: ${excludedCount}`);
 console.log(`Уже есть запись об оплате (пропущено): ${skippedExisting}`);
 console.log(`Будет записано оплат: ${rows.length}`);
 console.log(`  с суммой по тарифу: ${withAmount.length} на ${withAmount.reduce((s, r) => s + r.amountRub, 0)}₽`);
