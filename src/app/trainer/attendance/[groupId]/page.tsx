@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
-import { getPaymentStatus } from "@/lib/payment";
+import {
+  formatDayMonth,
+  formatLessonsCount,
+  getAttendanceDebtForChildren,
+} from "@/lib/unpaidAttendance";
 import { saveAttendanceAction } from "@/lib/actions/attendance-actions";
 import { saveCourseResultsAction } from "@/lib/actions/course-actions";
 import { COURSE_RESULT_NAME } from "@/lib/courseResults";
@@ -42,13 +46,9 @@ function PaymentMark({ paid }: { paid: boolean }) {
   );
 }
 
-function paymentLabel(paidUntil: Date | null): string {
-  if (!paidUntil) return "не оплачено";
-  const status = getPaymentStatus(paidUntil);
-  if (status.tone === "red") return "оплата просрочена";
-  const dd = String(paidUntil.getUTCDate()).padStart(2, "0");
-  const mm = String(paidUntil.getUTCMonth() + 1).padStart(2, "0");
-  return `оплачено до ${dd}.${mm}`;
+function paymentLabel(paidUntil: Date | null, lastPresent: Date | null): string {
+  const paid = paidUntil ? `оплачено до ${formatDayMonth(paidUntil)}` : "не оплачено";
+  return lastPresent ? `${paid} · последнее занятие ${formatDayMonth(lastPresent)}` : paid;
 }
 
 export default async function AttendanceGroupPage({
@@ -93,6 +93,7 @@ export default async function AttendanceGroupPage({
       select: { childId: true },
     }),
   ]);
+  const debtByChildId = await getAttendanceDebtForChildren(children.map((c) => c.id));
   const recordByChildId = new Map(records.map((r) => [r.childId, r]));
   // Пришедшая через кабинет родителя пометка "не придём" — актуальна, только
   // пока по этому дню/группе нет отдельной отметки тренера (см. workoffs.ts).
@@ -270,7 +271,20 @@ export default async function AttendanceGroupPage({
                           {child.lastName} {child.firstName}
                         </p>
                       </div>
-                      <p className="text-xs text-brand-text/50">{paymentLabel(child.paidUntil)}</p>
+                      {(() => {
+                        const debt = debtByChildId.get(child.id);
+                        const unpaid = debt?.unpaid ?? 0;
+                        return (
+                          <p className={`text-xs ${unpaid > 0 ? "text-red-300" : "text-brand-text/50"}`}>
+                            {paymentLabel(child.paidUntil, debt?.lastPresent ?? null)}
+                            {unpaid > 0 && (
+                              <span className="block font-medium">
+                                ходит без оплаты: {formatLessonsCount(unpaid)}
+                              </span>
+                            )}
+                          </p>
+                        );
+                      })()}
                       {notifiedChildIds.has(child.id) && (
                         <Badge tone="amber" className="mt-1">
                           Родитель предупредил

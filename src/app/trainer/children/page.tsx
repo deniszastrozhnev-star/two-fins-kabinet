@@ -6,12 +6,43 @@ import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatPhone } from "@/lib/phone";
 import { formatDateRu } from "@/lib/dates";
+import {
+  formatDayMonth,
+  formatLessonsCount,
+  getChildrenWithoutPayment,
+  type UnpaidChild,
+} from "@/lib/unpaidAttendance";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/Button";
 import { ChildrenList, type ChildListItem } from "@/components/trainer/ChildrenList";
 
 const PENDING_VISIBLE = 8;
+const UNPAID_VISIBLE = 8;
+
+function UnpaidChildRow({ row }: { row: UnpaidChild }) {
+  return (
+    <li>
+      <Link
+        href={`/trainer/children/${row.id}`}
+        className="flex flex-col gap-0.5 py-2.5 hover:bg-white/5"
+      >
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <span className="min-w-0 break-words font-medium">
+            {row.lastName} {row.firstName}
+          </span>
+          <span className="text-xs font-medium text-red-300">
+            без оплаты: {formatLessonsCount(row.unpaid)}
+          </span>
+        </span>
+        <span className="text-xs text-brand-text/60">
+          {row.groupName ?? "без группы"} · последнее занятие {formatDayMonth(row.lastPresent)} ·{" "}
+          {row.paidUntil ? `оплачено до ${formatDayMonth(row.paidUntil)}` : "не оплачивал"}
+        </span>
+      </Link>
+    </li>
+  );
+}
 
 function PendingReceiptRow({
   row,
@@ -77,7 +108,7 @@ export default async function ChildrenPage() {
   const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
   const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
-  const [balances, unviewedReceipts, pendingReceipts, certificates, contracts] = await Promise.all([
+  const [balances, unviewedReceipts, pendingReceipts, certificates, contracts, unpaidChildren] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
@@ -100,6 +131,9 @@ export default async function ChildrenPage() {
       where: { childId: { in: children.map((c) => c.id) } },
       select: { childId: true },
     }),
+    // Отдельный блок наверху (порядок основного списка не трогаем): дети с
+    // отметками «Пришёл» позже срока оплаты, см. lib/unpaidAttendance.ts.
+    getChildrenWithoutPayment(),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
 
@@ -219,6 +253,33 @@ export default async function ChildrenPage() {
                 <ul className="flex flex-col divide-y divide-white/10">
                   {pendingRows.slice(PENDING_VISIBLE).map((r) => (
                     <PendingReceiptRow key={r.id} row={r} />
+                  ))}
+                </ul>
+              </details>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {unpaidChildren.length > 0 && (
+        <Card className="mb-5 border-red-500/30 bg-red-500/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold text-red-200">
+              Ходят без оплаты ({unpaidChildren.length})
+            </h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {unpaidChildren.slice(0, UNPAID_VISIBLE).map((r) => (
+                <UnpaidChildRow key={r.id} row={r} />
+              ))}
+            </ul>
+            {unpaidChildren.length > UNPAID_VISIBLE && (
+              <details className="mt-1">
+                <summary className="cursor-pointer py-2 text-sm text-brand-cyan">
+                  Показать ещё {unpaidChildren.length - UNPAID_VISIBLE}
+                </summary>
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {unpaidChildren.slice(UNPAID_VISIBLE).map((r) => (
+                    <UnpaidChildRow key={r.id} row={r} />
                   ))}
                 </ul>
               </details>
