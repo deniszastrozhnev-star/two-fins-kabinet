@@ -1,0 +1,188 @@
+"use client";
+
+import { useActionState, useMemo, useState } from "react";
+import { changeOwnChildGroupAction } from "@/lib/actions/parent-actions";
+import { computeCombinedPrice, GroupOption, type ChildGroupOption } from "@/components/shared/GroupPicker";
+import { SaveButton } from "@/components/trainer/SaveButton";
+import { LEVEL_LABELS, LEVEL_ORDER } from "@/lib/labels";
+
+/** Тот же конструктор группы, что у тренера (ChildGroupForm) и в онлайн-записи
+ * — с одним отличием: если смена группы меняет тариф, перед сохранением
+ * нужно явно нажать «Проверить стоимость» и увидеть цену до/после, прежде
+ * чем появится кнопка «Сохранить». Действует сразу, без подтверждения
+ * тренера — предполагается родительская ответственность за выбор. */
+export function ParentGroupChangeForm({
+  groups,
+  currentGroupId,
+  currentExtraGroupId,
+  currentPrice,
+}: {
+  groups: ChildGroupOption[];
+  currentGroupId: string | null;
+  currentExtraGroupId: string | null;
+  currentPrice: number | null;
+}) {
+  const [state, formAction] = useActionState(changeOwnChildGroupAction, undefined);
+
+  const [baseGroupId, setBaseGroupId] = useState<string>(currentGroupId ?? "");
+  const [wantsExtra, setWantsExtra] = useState(currentExtraGroupId != null);
+  const [extraGroupId, setExtraGroupId] = useState<string>(currentExtraGroupId ?? "");
+  const [confirmed, setConfirmed] = useState(false);
+
+  const baseGroup = groups.find((g) => g.id === baseGroupId) ?? null;
+  const extraCandidates = useMemo(
+    () => (baseGroup ? groups.filter((g) => g.id !== baseGroup.id && g.pool === baseGroup.pool) : []),
+    [groups, baseGroup],
+  );
+  const extraGroup = extraCandidates.find((g) => g.id === extraGroupId) ?? null;
+
+  const newPrice = baseGroup ? computeCombinedPrice(baseGroup, wantsExtra ? extraGroup : null) : null;
+
+  const groupsByLevel = LEVEL_ORDER.map((level) => ({
+    level,
+    groups: groups.filter((g) => g.level === level),
+  })).filter((section) => section.groups.length > 0);
+
+  const somethingChanged =
+    baseGroupId !== (currentGroupId ?? "") ||
+    (wantsExtra ? extraGroupId : "") !== (currentExtraGroupId ?? "");
+  const priceChanged = somethingChanged && newPrice !== currentPrice;
+
+  function resetConfirmation() {
+    setConfirmed(false);
+  }
+
+  return (
+    <form action={formAction} className="flex flex-col gap-4">
+      <div>
+        <p className="mb-2 text-sm font-medium text-brand-text/80">Группа</p>
+        <div className="flex flex-col gap-3">
+          <label className="relative flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm transition has-[:checked]:border-brand-cyan/50 has-[:checked]:bg-brand-cyan/10">
+            <input
+              type="radio"
+              name="groupId"
+              value=""
+              checked={baseGroupId === ""}
+              onChange={() => {
+                setBaseGroupId("");
+                setExtraGroupId("");
+                setWantsExtra(false);
+                resetConfirmation();
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+            <span className="font-medium text-brand-text/70">Без группы</span>
+          </label>
+          {groupsByLevel.map((section) => (
+            <div key={section.level}>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-brand-text/50">
+                {LEVEL_LABELS[section.level]}
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {section.groups.map((g) => (
+                  <GroupOption
+                    key={g.id}
+                    group={g}
+                    name="groupId"
+                    checked={baseGroupId === g.id}
+                    onChange={() => {
+                      setBaseGroupId(g.id);
+                      setExtraGroupId("");
+                      resetConfirmation();
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {baseGroup && (
+        <div>
+          <label className="flex items-center gap-2 text-sm text-brand-text/80">
+            <input
+              type="checkbox"
+              checked={wantsExtra}
+              onChange={(e) => {
+                setWantsExtra(e.target.checked);
+                setExtraGroupId("");
+                resetConfirmation();
+              }}
+            />
+            Доп. занятие в другой группе
+          </label>
+
+          {wantsExtra && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {extraCandidates.length === 0 ? (
+                <p className="text-xs text-brand-text/50">
+                  Нет других групп в бассейне «{baseGroup.pool}»
+                </p>
+              ) : (
+                extraCandidates.map((g) => (
+                  <GroupOption
+                    key={g.id}
+                    group={g}
+                    name="extraGroupId"
+                    checked={extraGroupId === g.id}
+                    onChange={() => {
+                      setExtraGroupId(g.id);
+                      resetConfirmation();
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {priceChanged && !confirmed && (
+        <button
+          type="button"
+          onClick={() => setConfirmed(true)}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-sm font-medium text-amber-200 transition hover:bg-amber-500/15"
+        >
+          Стоимость изменится — нажмите, чтобы проверить перед сохранением
+        </button>
+      )}
+
+      {priceChanged && confirmed && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm text-amber-200">
+            Стоимость изменится:{" "}
+            <span className="line-through opacity-70">
+              {currentPrice != null ? `${currentPrice.toLocaleString("ru-RU")}₽` : "—"}
+            </span>{" "}
+            → <span className="font-semibold">{newPrice != null ? `${newPrice.toLocaleString("ru-RU")}₽` : "—"}/мес</span>
+          </p>
+        </div>
+      )}
+
+      {!priceChanged && newPrice != null && somethingChanged && (
+        <div className="rounded-xl border border-brand-cyan/30 bg-brand-cyan/10 px-4 py-3">
+          <p className="text-sm text-brand-text/70">Стоимость без изменений</p>
+          <p className="font-heading text-xl font-bold text-brand-cyan">
+            {newPrice.toLocaleString("ru-RU")}₽/мес
+          </p>
+        </div>
+      )}
+
+      {state?.error && (
+        <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{state.error}</p>
+      )}
+      {state?.success && (
+        <p className="rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">
+          {state.success}
+        </p>
+      )}
+
+      {somethingChanged && (!priceChanged || confirmed) && (
+        <div className="flex justify-end">
+          <SaveButton>Сохранить</SaveButton>
+        </div>
+      )}
+    </form>
+  );
+}

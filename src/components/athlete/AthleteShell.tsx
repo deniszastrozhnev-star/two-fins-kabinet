@@ -4,13 +4,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { AvatarUpload } from "@/components/athlete/AvatarUpload";
 import { AthleteRankSelect } from "@/components/athlete/AthleteRankSelect";
 import { AthleteGenderSelect } from "@/components/athlete/AthleteGenderSelect";
-import { StoryRail } from "@/components/shared/StoryRail";
 import { NavCardGrid } from "@/components/shared/NavCardGrid";
 import type { NavCardItem } from "@/components/shared/NavCard";
-import { DiaryIcon, LevelTaskIcon, TrophyIcon, RatingIcon, StoriesIcon } from "@/components/icons";
+import { DiaryIcon, LevelTaskIcon, TrophyIcon, RatingIcon } from "@/components/icons";
 import { ATHLETE_RANK_COLORS, ATHLETE_RANK_LABELS } from "@/lib/labels";
 import type { AthleteRank, Gender } from "@prisma/client";
-import type { StoriesFeed } from "@/lib/stories";
 
 function navItems(weekPlace: number | null, weekTotal: number): NavCardItem[] {
   const iconClass = "h-6 w-6";
@@ -27,7 +25,6 @@ function navItems(weekPlace: number | null, weekTotal: number): NavCardItem[] {
         ? { label: `${weekPlace}/${weekTotal} место`, tone: "neutral" }
         : undefined,
     },
-    { href: "#stories", label: "Истории", icon: <StoriesIcon className={iconClass} /> },
   ];
 }
 
@@ -42,7 +39,6 @@ export function AthleteShell({
   weekGymMinutes,
   weekPlace,
   weekTotal,
-  storiesFeed,
 }: {
   children: React.ReactNode;
   athleteName: string;
@@ -54,7 +50,6 @@ export function AthleteShell({
   weekGymMinutes: number;
   weekPlace: number | null;
   weekTotal: number;
-  storiesFeed: StoriesFeed;
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -136,10 +131,6 @@ export function AthleteShell({
               <p className="mt-0.5 text-xs text-brand-text/60">место в рейтинге</p>
             </CardBody>
           </Card>
-        </div>
-
-        <div className="mt-6 scroll-mt-24" id="stories">
-          <StoryRail feed={storiesFeed} ownName={athleteName} ownAvatarUrl={avatarUrl} />
         </div>
 
         <div className="mt-6">

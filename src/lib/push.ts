@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { formatDateRu } from "@/lib/dates";
 
 type PushPayload = { title: string; body: string; url?: string };
 
@@ -28,12 +29,13 @@ async function getWebPush() {
   return webpush;
 }
 
-/** Рассылает push всем подписанным родителям. Тихо no-op, если пуши не настроены. */
-export async function broadcastPush(payload: PushPayload): Promise<void> {
-  const webpush = await getWebPush();
-  if (!webpush) return;
+type WebPushClient = NonNullable<Awaited<ReturnType<typeof getWebPush>>>;
 
-  const subs = await prisma.pushSubscription.findMany();
+async function sendToSubscriptions(
+  webpush: WebPushClient,
+  subs: { id: string; endpoint: string; p256dh: string; auth: string }[],
+  payload: PushPayload,
+): Promise<void> {
   const staleIds: string[] = [];
 
   await Promise.all(
@@ -62,4 +64,50 @@ export async function broadcastPush(payload: PushPayload): Promise<void> {
   if (staleIds.length > 0) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: staleIds } } }).catch(() => {});
   }
+}
+
+/** Рассылает push всем подписанным родителям. Тихо no-op, если пуши не настроены. */
+export async function broadcastPush(payload: PushPayload): Promise<void> {
+  const webpush = await getWebPush();
+  if (!webpush) return;
+  const subs = await prisma.pushSubscription.findMany();
+  await sendToSubscriptions(webpush, subs, payload);
+}
+
+/** Сколько семей реально получат широковещательный push прямо сейчас — у
+ * одной семьи может быть несколько подписок (разные устройства), считаем по
+ * уникальному parentPhone, а не по числу подписок. */
+export async function countActiveSubscriberFamilies(): Promise<number> {
+  const rows = await prisma.pushSubscription.findMany({
+    select: { parentPhone: true },
+    distinct: ["parentPhone"],
+  });
+  return rows.length;
+}
+
+/** Push подпискам одной семьи (по телефону — см. схему PushSubscription: у
+ * родителя может быть несколько детей и несколько устройств, подписка
+ * привязана к семье целиком, а не к конкретному ребёнку). Тихо no-op, если
+ * пуши не настроены или подписок нет. */
+export async function sendPushToFamily(parentPhone: string, payload: PushPayload): Promise<void> {
+  const webpush = await getWebPush();
+  if (!webpush) return;
+  const subs = await prisma.pushSubscription.findMany({ where: { parentPhone } });
+  if (subs.length === 0) return;
+  await sendToSubscriptions(webpush, subs, payload);
+}
+
+/** "Оплата принята" — общий текст для всех мест, где тренер отмечает оплату
+ * (кнопка "Оплачено", подтверждение чека по тарифу, ручное указание даты).
+ * Имя ребёнка — обязательно в тексте: семья может состоять из нескольких
+ * детей, и push должен явно указывать, о ком речь. */
+export async function sendPaymentAcceptedPush(
+  child: { firstName: string; lastName: string; parentPhone: string },
+  paidUntil: Date,
+): Promise<void> {
+  await sendPushToFamily(child.parentPhone, {
+    title: "Оплата принята",
+    body: `${child.lastName} ${child.firstName}: оплата подтверждена, занятия оплачены до ${formatDateRu(paidUntil)}.`,
+    url: "/parent",
+  });
 }

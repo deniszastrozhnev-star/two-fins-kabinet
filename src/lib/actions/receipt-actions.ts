@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { endOfMonth } from "date-fns";
-import { put } from "@vercel/blob";
+import { put } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { requireParentChild, requireTrainer } from "@/lib/auth";
 import { resizeForUpload } from "@/lib/image";
-import { recognizeTextSafe } from "@/lib/ocr";
-import { extractAmountCandidates, matchTariff, getKnownTariffs } from "@/lib/tariffs";
 import { parseDateInputValue } from "@/lib/dates";
+import { sendPaymentAcceptedPush } from "@/lib/push";
+import { recordPaymentConfirmation } from "@/lib/payments";
 
 export type ActionState = { error?: string; success?: string } | undefined;
 
@@ -45,25 +45,9 @@ export async function uploadReceiptAction(
 
   const blob = await put(key, buffer, { access: "private", contentType });
 
-  const receipt = await prisma.paymentReceipt.create({
+  await prisma.paymentReceipt.create({
     data: { childId: child.id, fileUrl: blob.url, contentType },
   });
-
-  // Распознавание — лучшее из возможного; чек уже сохранён и не зависит от результата.
-  if (contentType.startsWith("image/")) {
-    const text = await recognizeTextSafe(buffer);
-    if (text) {
-      const candidates = extractAmountCandidates(text);
-      const tariffs = await getKnownTariffs();
-      const match = matchTariff(candidates, tariffs);
-      if (match) {
-        await prisma.paymentReceipt.update({
-          where: { id: receipt.id },
-          data: { recognizedAmount: match.amount },
-        });
-      }
-    }
-  }
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${child.id}`);
@@ -79,51 +63,75 @@ export async function markLatestReceiptViewed(childId: string) {
   });
 }
 
-/** Тренер подтверждает: распознанная сумма — это оплата по тарифу, продлеваем до конца месяца. */
+/** Тренер подтверждает чек по тарифу — продлеваем до конца текущего месяца. */
 export async function confirmReceiptTariffAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const receiptId = String(formData.get("receiptId") ?? "");
   const childId = String(formData.get("childId") ?? "");
   if (!receiptId || !childId) throw new Error("Не найден чек");
 
-  await prisma.$transaction([
+  const paidUntil = endOfMonth(new Date());
+  const [updated] = await prisma.$transaction([
     prisma.child.update({
       where: { id: childId },
-      data: { paidUntil: endOfMonth(new Date()) },
+      data: { paidUntil },
     }),
     prisma.paymentReceipt.update({
       where: { id: receiptId },
       data: { resolvedAt: new Date() },
     }),
   ]);
+  await recordPaymentConfirmation({ childId, paidUntil, source: "RECEIPT_TARIFF", trainerId: trainer.id });
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${childId}`);
   revalidatePath("/parent", "layout");
+
+  await sendPaymentAcceptedPush(updated, paidUntil).catch((err) =>
+    console.error("confirmReceiptTariffAction: push failed", err),
+  );
 }
 
-/** Тренер указывает дату оплаты вручную — распознанная сумма не подошла (доплата, нестандартный случай). */
+/** Тренер указывает дату оплаты вручную (доплата, нестандартный случай). */
 export async function manualReceiptResolutionAction(formData: FormData) {
-  await requireTrainer();
+  const trainer = await requireTrainer();
   const receiptId = String(formData.get("receiptId") ?? "");
   const childId = String(formData.get("childId") ?? "");
   const dateStr = String(formData.get("paidUntil") ?? "");
   if (!receiptId || !childId || !dateStr) {
     throw new Error("Укажите дату оплаты");
   }
+  // Сумма вводится вручную (доплата/нестандартный случай); пусто — берётся тариф ребёнка.
+  const amountRaw = String(formData.get("amountRub") ?? "").trim();
+  const amountRub = amountRaw ? Math.round(Number(amountRaw)) : undefined;
+  if (amountRub !== undefined && (!Number.isFinite(amountRub) || amountRub < 0)) {
+    throw new Error("Некорректная сумма оплаты");
+  }
 
-  await prisma.$transaction([
+  const paidUntil = parseDateInputValue(dateStr);
+  const [updated] = await prisma.$transaction([
     prisma.child.update({
       where: { id: childId },
-      data: { paidUntil: parseDateInputValue(dateStr) },
+      data: { paidUntil },
     }),
     prisma.paymentReceipt.update({
       where: { id: receiptId },
       data: { resolvedAt: new Date() },
     }),
   ]);
+  await recordPaymentConfirmation({
+    childId,
+    paidUntil,
+    source: "RECEIPT_MANUAL",
+    trainerId: trainer.id,
+    amountRub,
+  });
 
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${childId}`);
   revalidatePath("/parent", "layout");
+
+  await sendPaymentAcceptedPush(updated, paidUntil).catch((err) =>
+    console.error("manualReceiptResolutionAction: push failed", err),
+  );
 }

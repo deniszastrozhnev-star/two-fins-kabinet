@@ -70,6 +70,10 @@ export function TrainerShell({
     { href: "/trainer/settings", label: "Настройки", icon: <SettingsIcon className={iconClass} /> },
   ];
 
+  if (!isHead) {
+    items.push({ href: "/trainer/report", label: "Мой отчёт", icon: <ReportIcon className={iconClass} /> });
+  }
+
   if (isHead) {
     items.push(
       { href: "/trainer/athlete-levels", label: "Тренировки", icon: <LevelTaskIcon className={iconClass} /> },

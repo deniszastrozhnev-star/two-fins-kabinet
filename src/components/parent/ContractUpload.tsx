@@ -1,15 +1,39 @@
 "use client";
 
 import { useActionState, useRef, useEffect, useState } from "react";
-import { upload } from "@vercel/blob/client";
 import { uploadContractAction } from "@/lib/actions/contract-actions";
 import { compressImageClientSide } from "@/lib/imageClient";
 import { Button } from "@/components/ui/Button";
 
-// Страницы договора грузятся напрямую в Vercel Blob с клиента (в обход
-// serverless-лимита тела запроса ~4.5 МБ, который бьёт по одиночным чекам/
-// справкам) — поэтому лимит здесь заметно выше, а не занижен под тот же
-// потолок. Клиентское сжатие всё равно держит итоговый объём разумным.
+async function uploadPage(file: File): Promise<{ url: string; contentType: string }> {
+  const key = `contract-pages/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+  const tokenRes = await fetch("/api/contracts/upload-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, contentType: file.type }),
+  });
+  if (!tokenRes.ok) {
+    const body = await tokenRes.json().catch(() => null);
+    throw new Error(body?.error ?? "Не удалось получить ссылку для загрузки");
+  }
+  const { url } = (await tokenRes.json()) as { url: string };
+
+  const putRes = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!putRes.ok) {
+    throw new Error("Не удалось загрузить страницу, попробуйте ещё раз");
+  }
+
+  return { url: key, contentType: file.type };
+}
+
+// Страницы договора грузятся напрямую в хранилище с клиента по presigned
+// PUT-ссылке (в обход лимита тела серверного экшена) — поэтому лимит здесь
+// заметно выше, а не занижен под тот же потолок. Клиентское сжатие всё равно
+// держит итоговый объём разумным.
 const MAX_PAGE_BYTES = 10 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 
@@ -62,12 +86,8 @@ export function ContractUpload() {
           prepared.length > 1 ? `Загружаем страницу ${i + 1} из ${prepared.length}…` : "Загружаем…",
         );
         const file = prepared[i];
-        const blob = await upload(`contract-pages/${Date.now()}-${i}-${file.name}`, file, {
-          access: "private",
-          handleUploadUrl: "/api/contracts/upload-token",
-          contentType: file.type,
-        });
-        pages.push({ url: blob.url, contentType: file.type });
+        const page = await uploadPage(file);
+        pages.push(page);
       }
 
       setProgressText(prepared.length > 1 ? "Собираем PDF…" : "Сохраняем…");

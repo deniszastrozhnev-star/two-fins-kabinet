@@ -14,29 +14,28 @@ import { endOfMonth } from "date-fns";
 export function ReceiptTariffPrompt({
   receiptId,
   childId,
-  recognizedAmount,
-  tariffLabel,
+  tariffRub,
 }: {
   receiptId: string;
   childId: string;
-  recognizedAmount: number;
-  tariffLabel: string;
+  /** Тариф ребёнка сейчас (₽/мес) — именно эта сумма запишется как оплата при
+   * подтверждении «по тарифу»; null — тарифа нет (нет группы/цены). */
+  tariffRub: number | null;
 }) {
   const [manual, setManual] = useState(false);
   const endOfThisMonth = endOfMonth(new Date());
 
   return (
     <div className="mt-2 rounded-lg border border-brand-cyan/30 bg-brand-cyan/10 p-3">
-      <p className="text-sm text-brand-text/80">
-        Распознано: <span className="font-semibold text-brand-cyan">{recognizedAmount.toLocaleString("ru-RU")}₽</span> — похоже на {tariffLabel}
-      </p>
       {!manual ? (
         <div className="mt-2 flex flex-wrap gap-2">
           <form action={confirmReceiptTariffAction}>
             <input type="hidden" name="receiptId" value={receiptId} />
             <input type="hidden" name="childId" value={childId} />
             <SaveButton>
-              {`Продлить по тарифу до ${formatDateRu(endOfThisMonth)}`}
+              {tariffRub != null
+                ? `Продлить по тарифу (${tariffRub.toLocaleString("ru-RU")}₽) до ${formatDateRu(endOfThisMonth)}`
+                : `Продлить до ${formatDateRu(endOfThisMonth)} (тарифа нет — без суммы)`}
             </SaveButton>
           </form>
           <Button
@@ -64,6 +63,19 @@ export function ReceiptTariffPrompt({
               name="paidUntil"
               defaultValue={toDateInputValue(endOfThisMonth)}
               required
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-brand-text/80">
+              Сумма, ₽
+            </label>
+            <Input
+              type="number"
+              name="amountRub"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              placeholder={tariffRub != null ? String(tariffRub) : "сумма оплаты"}
             />
           </div>
           <SaveButton>Сохранить</SaveButton>

@@ -36,11 +36,11 @@ export default async function ParentWorkoffSchedulePage() {
         description={`Группы уровня «${LEVEL_LABELS[child.group.level]}» — куда можно прийти отрабатывать`}
       />
 
-      {balance <= 0 && (
-        <p className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-brand-text/60">
-          Сейчас у вас нет пропущенных занятий, требующих отработки.
-        </p>
-      )}
+      <p className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-brand-text/60">
+        {balance > 0
+          ? `Доступно отработок: ${balance}`
+          : "Сейчас у вас нет пропущенных занятий, требующих отработки."}
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {groups.map((g) => (

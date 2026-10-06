@@ -2,20 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { formatDateRu } from "@/lib/dates";
-import { getActiveStoriesFeed } from "@/lib/stories";
+import { getTodaysBirthdays } from "@/lib/birthdays";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TrainerAvatarUpload } from "@/components/trainer/TrainerAvatarUpload";
 import { TrainerProfileForm } from "@/components/trainer/TrainerProfileForm";
-import { StoryRail } from "@/components/shared/StoryRail";
 
 export default async function TrainerDashboardPage() {
   const trainer = await requireTrainer();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [upcomingEvents, myGroups, storiesFeed] = await Promise.all([
+  const [upcomingEvents, myGroups, birthdays] = await Promise.all([
     prisma.event.findMany({
       where: { dateStart: { gte: today } },
       orderBy: { dateStart: "asc" },
@@ -25,7 +24,7 @@ export default async function TrainerDashboardPage() {
       where: { trainers: { some: { id: trainer.id } } },
       orderBy: { name: "asc" },
     }),
-    getActiveStoriesFeed({ role: "trainer", id: trainer.id }),
+    getTodaysBirthdays(),
   ]);
   const avatarUrl = trainer.avatarUrl ? `/api/trainer-avatars/${trainer.id}` : null;
   const displayName = trainer.displayName ?? trainer.username;
@@ -36,6 +35,23 @@ export default async function TrainerDashboardPage() {
         title={`Здравствуйте, ${trainer.username}`}
         description="Быстрый обзор школы"
       />
+
+      {birthdays.length > 0 && (
+        <Card className="mb-6 border-amber-500/30 bg-amber-500/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-lg font-bold text-amber-200">
+              🎂 Именинники сегодня
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {birthdays.map((b) => (
+                <Badge key={b.id} tone="amber">
+                  {b.lastName} {b.firstName} · {b.age}
+                </Badge>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_2fr]">
         <Card>
@@ -66,19 +82,6 @@ export default async function TrainerDashboardPage() {
           </CardBody>
         </Card>
       </div>
-
-      <Card className="mb-8">
-        <CardBody>
-          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
-          <StoryRail
-            feed={storiesFeed}
-            ownName={displayName}
-            ownAvatarUrl={avatarUrl}
-            canModerate
-            canPost
-          />
-        </CardBody>
-      </Card>
 
       <h2 className="mb-3 font-heading text-lg font-bold">Ближайшие события</h2>
       {upcomingEvents.length === 0 ? (

@@ -4,6 +4,7 @@ import { EVENT_TYPE_LABELS } from "@/lib/labels";
 import { formatDateRu } from "@/lib/dates";
 import { isEventPast, sortEventsByRelevance } from "@/lib/events";
 import { signUpForEventAction, cancelSignupAction } from "@/lib/actions/signup-actions";
+import { markEventsSeenAction } from "@/lib/actions/child-profile-actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -13,6 +14,7 @@ import { PushNotificationPrompt } from "@/components/parent/PushNotificationProm
 
 export default async function ParentEventsPage() {
   const child = await requireParentChild();
+  await markEventsSeenAction();
 
   const [eventsRaw, mySignups] = await Promise.all([
     prisma.event.findMany(),

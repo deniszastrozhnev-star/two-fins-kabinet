@@ -1,16 +1,19 @@
 "use client";
 
+import { useActionState } from "react";
 import { FieldGroup, Input, Select } from "@/components/ui/Field";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { toDateInputValue } from "@/lib/dates";
+import type { ChildFormState } from "@/lib/actions/child-actions";
 
 export function ChildForm({
   action,
   groups,
   initial,
   submitLabel = "Сохранить",
+  hideGroupField = false,
 }: {
-  action: (formData: FormData) => void;
+  action: (prevState: ChildFormState, formData: FormData) => ChildFormState | Promise<ChildFormState>;
   groups: { id: string; name: string }[];
   initial?: {
     id?: string;
@@ -22,9 +25,14 @@ export function ChildForm({
     birthDate?: Date | null;
   };
   submitLabel?: string;
+  /** На карточке ребёнка группа и доп. занятие редактируются отдельным
+   * конструктором (ChildGroupForm) — здесь поле не нужно и не дублируется. */
+  hideGroupField?: boolean;
 }) {
+  const [state, formAction] = useActionState(action, undefined);
+
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4">
       {initial?.id && <input type="hidden" name="id" value={initial.id} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <FieldGroup label="Фамилия" htmlFor="lastName">
@@ -45,16 +53,18 @@ export function ChildForm({
         </FieldGroup>
       </div>
 
-      <FieldGroup label="Группа" htmlFor="groupId">
-        <Select id="groupId" name="groupId" defaultValue={initial?.groupId ?? ""}>
-          <option value="">Без группы</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </Select>
-      </FieldGroup>
+      {!hideGroupField && (
+        <FieldGroup label="Группа" htmlFor="groupId">
+          <Select id="groupId" name="groupId" defaultValue={initial?.groupId ?? ""}>
+            <option value="">Без группы</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        </FieldGroup>
+      )}
 
       <FieldGroup
         label="Телефон родителя"
@@ -86,7 +96,7 @@ export function ChildForm({
       <FieldGroup
         label="Оплачено до"
         htmlFor="paidUntil"
-        hint="Можно скорректировать вручную; кнопка «Оплачено» ставит конец текущего месяца"
+        hint="При сохранении новой даты родителю сразу уходит push «Оплата принята»"
       >
         <Input
           id="paidUntil"
@@ -97,6 +107,15 @@ export function ChildForm({
           }
         />
       </FieldGroup>
+
+      {state?.error && (
+        <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{state.error}</p>
+      )}
+      {state?.success && (
+        <p className="rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">
+          {state.success}
+        </p>
+      )}
 
       <div className="mt-2 flex justify-end">
         <SaveButton>{submitLabel}</SaveButton>

@@ -23,9 +23,11 @@ model Trainer {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  attendanceRecords AttendanceRecord[]
-  personalTrainings PersonalTraining[]
-  groups            Group[]            @relation("TrainerGroups")
+  attendanceRecords    AttendanceRecord[]
+  personalTrainings    PersonalTraining[]
+  groups               Group[]               @relation("TrainerGroups")
+  broadcastPushesSent  BroadcastPushSent[]
+  paymentConfirmations PaymentConfirmation[]
 }
 
 enum GroupLevel {
@@ -63,6 +65,7 @@ model Group {
   waitlist                 GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
   trainers                 Trainer[]                 @relation("TrainerGroups")
+  parentAbsenceNotices     ParentAbsenceNotice[]
 }
 
 enum ChildStatus {
@@ -71,18 +74,23 @@ enum ChildStatus {
 }
 
 model Child {
-  id          String      @id @default(cuid())
-  lastName    String
-  firstName   String
-  groupId     String?
-  group       Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  parentPhone String // хранится нормализованным (только цифры)
-  paidUntil   DateTime?
-  status      ChildStatus @default(ACTIVE)
-  note        String? // заметка тренера (например при звонке "холодному" ребёнку)
-  birthDate   DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  lastName         String
+  firstName        String
+  groupId          String?
+  group            Group?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentPhone      String // хранится нормализованным (только цифры)
+  paidUntil        DateTime?
+  status           ChildStatus @default(ACTIVE)
+  note             String? // заметка тренера (например при звонке "холодному" ребёнку)
+  birthDate        DateTime?   @db.Date // дата рождения ребёнка (собирается при онлайн-записи)
+  avatarUrl        String? // фото профиля, загружает родитель в кабинете
+  // Когда родитель последний раз открывал "Новости" для ЭТОГО ребёнка — своя
+  // отметка на каждого ребёнка семьи (не общая на телефон), чтобы баннер
+  // "новая новость" на первом экране не путался при переключении между детьми.
+  lastSeenEventsAt DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   attendanceRecords        AttendanceRecord[]
   eventSignups             EventSignup[]
@@ -94,7 +102,11 @@ model Child {
   waitlistEntries          GroupWaitlist[]
   extraSessionEntitlements ExtraSessionEntitlement[]
   linkedAthlete            Athlete?
-  pushSubscriptions        PushSubscription[]
+  paymentRemindersSent     PaymentReminderSent[]
+  medicalRemindersSent     MedicalReminderSent[]
+  birthdayGreetingsSent    BirthdayGreetingSent[]
+  parentAbsenceNotices     ParentAbsenceNotice[]
+  paymentConfirmations     PaymentConfirmation[]
 
   @@index([groupId])
   @@index([parentPhone])
@@ -137,6 +149,26 @@ enum AttendanceStatus {
   ABSENT
   WORKOFF
   EXTRA // "Допзанятие" — ребёнок пришёл в чужую группу доп. занятием (не отработка)
+}
+
+// Родитель заранее предупредил "сегодня не придём" (до начала занятия, из
+// кабинета) — отдельная от AttendanceRecord сущность, не отметка тренера:
+// markedByTrainerId там NOT NULL и участвует в расчёте зарплаты, а здесь
+// трenера вообще не было. Даёт право на отработку сразу же (см.
+// getWorkoffBalance) — если тренер позже всё равно сам отметит реальную
+// посещаемость на этот же день/группу, именно она в приоритете при подсчёте
+// остатка (см. комментарий в lib/workoffs.ts), чтобы не начислить дважды.
+model ParentAbsenceNotice {
+  id        String   @id @default(cuid())
+  childId   String
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@unique([childId, groupId, date])
+  @@index([groupId, date])
 }
 
 model AttendanceRecord {
@@ -510,18 +542,89 @@ model EventSignup {
   @@unique([eventId, childId])
 }
 
-// Один родитель может открыть кабинет на нескольких устройствах — у каждого
-// своя подписка (endpoint уникален per браузер/устройство), поэтому это
-// список, а не одна запись на ребёнка.
+// Подписка привязана к семье (номеру телефона родителя), а не к конкретному
+// ребёнку — у одного родителя может быть несколько детей, и устройство должно
+// получать уведомления про всех, а не только про того, кто был активен на
+// экране в момент подписки. Один родитель может открыть кабинет на нескольких
+// устройствах — у каждого своя подписка (endpoint уникален per браузер/устройство).
 model PushSubscription {
-  id        String   @id @default(cuid())
-  childId   String
-  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  parentPhone String
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  createdAt   DateTime @default(now())
 
+  @@index([parentPhone])
+}
+
+enum PaymentConfirmationSource {
+  RECEIPT_TARIFF // чек подтверждён кнопкой «Продлить по тарифу»
+  RECEIPT_MANUAL // чек подтверждён с ручной датой/суммой
+  MARK_PAID // кнопка «Оплачено» в карточке ребёнка
+  DATE_EDIT // тренер сдвинул «Оплачено до» вперёд в карточке ребёнка
+  BACKFILL_TARIFF // дозаписано задним числом по дате подтверждения чека; сумма — тариф ребёнка, НЕ фактическая
+}
+
+// Факт подтверждённой оплаты — сумма записывается в момент, когда тренер
+// подтверждает оплату (раньше сохранялась только дата paidUntil, поэтому
+// выручку за прошлые периоды посчитать было нельзя). amountRub — тариф
+// ребёнка на момент подтверждения либо сумма, введённая тренером вручную;
+// null — если суммы не было (нет группы/тарифа). Уникальность по
+// (childId, paidUntil): повторное подтверждение того же срока не задваивает
+// оплату. Связи с ребёнком и тренером — SetNull, чтобы удаление ребёнка или
+// тренера не стирало прошлую выручку.
+model PaymentConfirmation {
+  id                   String                    @id @default(cuid())
+  childId              String?
+  child                Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
+  amountRub            Int?
+  paidUntil            DateTime                  @db.Date
+  source               PaymentConfirmationSource
+  confirmedByTrainerId String?
+  confirmedByTrainer   Trainer?                  @relation(fields: [confirmedByTrainerId], references: [id], onDelete: SetNull)
+  paidAt               DateTime                  @default(now())
+
+  @@unique([childId, paidUntil])
+  @@index([paidAt])
+}
+
+// История ручных рассылок push всем родителям (кнопка "Отправить всем
+// родителям" на /trainer/settings) — только для просмотра позже, кто и что
+// отправлял; recipientCount — сколько семей реально имели подписку на момент
+// отправки (не все родители её включали).
+model BroadcastPushSent {
+  id              String   @id @default(cuid())
+  text            String
+  recipientCount  Int
+  sentByTrainerId String
+  sentByTrainer   Trainer  @relation(fields: [sentByTrainerId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([sentByTrainerId])
+}
+
+enum PaymentReminderKind {
+  BEFORE_3D // за 3 дня до окончания
+  DUE_TODAY // в день окончания
+  OVERDUE_3D // через 3 дня после просрочки
+}
+
+// Журнал отправленных напоминаний об оплате — защита от дублей: уникальность
+// по (childId, kind, paidUntil) означает "это конкретное напоминание для этого
+// конкретного значения paidUntil уже отправлено", а не просто "сегодня уже
+// слали". Если тренер поменяет paidUntil (родитель оплатил), старая запись
+// становится просто историей, а для нового значения paidUntil напоминания
+// смогут сработать заново на общих основаниях.
+model PaymentReminderSent {
+  id        String              @id @default(cuid())
+  childId   String
+  child     Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  kind      PaymentReminderKind
+  paidUntil DateTime
+  sentAt    DateTime            @default(now())
+
+  @@unique([childId, kind, paidUntil])
   @@index([childId])
 }
 
@@ -531,4 +634,47 @@ model FinanceSettings {
   id             String   @id @default("singleton")
   monthlyRentRub Int      @default(180000)
   updatedAt      DateTime @updatedAt
+}
+
+enum MedicalReminderKind {
+  BEFORE_14D // за 14 дней до окончания действия анализов
+  DUE_TODAY // в день окончания
+}
+
+// Журнал отправленных напоминаний о справке — тот же паттерн защиты от
+// дублей, что и PaymentReminderSent: уникальность по (childId, kind,
+// validUntil) — если родитель загрузит новую справку с другим сроком, для
+// него напоминания смогут сработать заново на общих основаниях.
+model MedicalReminderSent {
+  id         String              @id @default(cuid())
+  childId    String
+  child      Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  kind       MedicalReminderKind
+  validUntil DateTime
+  sentAt     DateTime            @default(now())
+
+  @@unique([childId, kind, validUntil])
+  @@index([childId])
+}
+
+// Отправлено ли поздравление с днём рождения — раз в год на ребёнка (year —
+// календарный год отправки, а не год рождения), чтобы не задублировать при
+// повторном суточном тике/ручном запуске в тот же день.
+model BirthdayGreetingSent {
+  id      String   @id @default(cuid())
+  childId String
+  child   Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  year    Int
+  sentAt  DateTime @default(now())
+
+  @@unique([childId, year])
+  @@index([childId])
+}
+
+// Единственная строка общих настроек приложения — тот же singleton-паттерн,
+// что и FinanceSettings, но для не-финансовых переключателей.
+model AppSettings {
+  id                    String   @id @default("singleton")
+  sendBirthdayGreetings Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
 }

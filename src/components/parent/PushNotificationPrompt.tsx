@@ -1,126 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { subscribePushAction, unsubscribePushAction } from "@/lib/actions/push-actions";
+import { useSyncExternalStore } from "react";
+import { usePushSubscription } from "@/lib/usePushSubscription";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { BellIcon } from "@/components/icons";
 
 const DISMISS_KEY = "twofins:hidePushPrompt";
+const dismissListeners = new Set<() => void>();
 
-function isStandalone(): boolean {
-  if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  // iOS Safari — нестандартный, но единственный способ узнать про PWA-режим
-  // (см. такую же проверку в InAppBrowserBanner.tsx).
-  return Boolean((window.navigator as { standalone?: boolean }).standalone);
+function subscribeDismissed(onStoreChange: () => void): () => void {
+  dismissListeners.add(onStoreChange);
+  return () => dismissListeners.delete(onStoreChange);
 }
 
-// Web Push API ждёт applicationServerKey в виде Uint8Array, а VAPID-ключ
-// приходит в URL-safe base64 — стандартное преобразование между ними.
-function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i);
-  return output;
+function getDismissedSnapshot(): boolean {
+  try {
+    return localStorage.getItem(DISMISS_KEY) != null;
+  } catch {
+    return false;
+  }
 }
 
-type Status =
-  | "checking"
-  | "unsupported"
-  | "needs-install"
-  | "denied"
-  | "off"
-  | "on"
-  | "busy";
+function getDismissedServerSnapshot(): boolean {
+  return false;
+}
+
+function markDismissed() {
+  try {
+    localStorage.setItem(DISMISS_KEY, "1");
+  } catch {
+    // localStorage недоступен (приватный режим) — просто не запомним выбор.
+  }
+  dismissListeners.forEach((listener) => listener());
+}
 
 export function PushNotificationPrompt() {
-  const [status, setStatus] = useState<Status>("checking");
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    if (localStorage.getItem(DISMISS_KEY)) {
-      setDismissed(true);
-      return;
-    }
-
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-
-    if (!supported) {
-      setStatus("unsupported");
-      return;
-    }
-    // На iPhone push работает только для сайта, добавленного на экран
-    // «Домой» — вне этого режима подписка технически недоступна.
-    if (isIOS && !isStandalone()) {
-      setStatus("needs-install");
-      return;
-    }
-    if (Notification.permission === "denied") {
-      setStatus("denied");
-      return;
-    }
-
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => registration.pushManager.getSubscription())
-      .then((existing) => setStatus(existing ? "on" : "off"))
-      .catch(() => setStatus("unsupported"));
-  }, []);
-
-  async function enable() {
-    setStatus("busy");
-    try {
-      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!publicKey) throw new Error("VAPID public key не задан");
-
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setStatus(permission === "denied" ? "denied" : "off");
-        return;
-      }
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-      const json = subscription.toJSON();
-      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-        throw new Error("Некорректная подписка");
-      }
-      await subscribePushAction({
-        endpoint: json.endpoint,
-        keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-      });
-      setStatus("on");
-    } catch (err) {
-      console.error("push: не удалось включить уведомления", err);
-      setStatus("off");
-    }
-  }
-
-  async function disable() {
-    setStatus("busy");
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-      const subscription = await registration?.pushManager.getSubscription();
-      if (subscription) {
-        await unsubscribePushAction(subscription.endpoint);
-        await subscription.unsubscribe();
-      }
-    } catch (err) {
-      console.error("push: не удалось отключить уведомления", err);
-    } finally {
-      setStatus("off");
-    }
-  }
+  const { status, enable, disable } = usePushSubscription();
+  const dismissed = useSyncExternalStore(
+    subscribeDismissed,
+    getDismissedSnapshot,
+    getDismissedServerSnapshot,
+  );
 
   function dismiss() {
-    localStorage.setItem(DISMISS_KEY, "1");
-    setDismissed(true);
+    markDismissed();
   }
 
   if (status === "checking" || status === "unsupported") return null;

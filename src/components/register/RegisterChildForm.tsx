@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState, useEffect } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { registerChildAction } from "@/lib/actions/registration-actions";
 import { computeCombinedPrice, type PricedGroup } from "@/lib/registrationTariffs";
 import { FieldGroup, Input } from "@/components/ui/Field";
 import { SubmitButton } from "@/components/auth/SubmitButton";
+import { RegistrationSuccess } from "@/components/register/RegistrationSuccess";
 import { LEVEL_LABELS, LEVEL_ORDER } from "@/lib/labels";
 import type { GroupLevel } from "@prisma/client";
 
@@ -57,15 +58,6 @@ export function RegisterChildForm({ groups }: { groups: RegistrationGroup[] }) {
   const [wantsExtra, setWantsExtra] = useState(false);
   const [extraGroupId, setExtraGroupId] = useState<string>("");
 
-  useEffect(() => {
-    if (state?.success) {
-      formRef.current?.reset();
-      setBaseGroupId("");
-      setWantsExtra(false);
-      setExtraGroupId("");
-    }
-  }, [state]);
-
   const baseGroup = groups.find((g) => g.id === baseGroupId) ?? null;
   const extraCandidates = useMemo(
     () => (baseGroup ? groups.filter((g) => g.id !== baseGroup.id && g.pool === baseGroup.pool) : []),
@@ -79,6 +71,10 @@ export function RegisterChildForm({ groups }: { groups: RegistrationGroup[] }) {
     level,
     groups: groups.filter((g) => g.level === level),
   })).filter((section) => section.groups.length > 0);
+
+  if (state?.success) {
+    return <RegistrationSuccess message={state.success} />;
+  }
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-5">
@@ -186,11 +182,6 @@ export function RegisterChildForm({ groups }: { groups: RegistrationGroup[] }) {
       {state?.error && (
         <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
           {state.error}
-        </p>
-      )}
-      {state?.success && (
-        <p className="rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">
-          {state.success}
         </p>
       )}
 

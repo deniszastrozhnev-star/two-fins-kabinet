@@ -12,13 +12,12 @@ import {
 // не меняется, просто перестаём слать лишний Set-Cookie на каждый клик.
 const REFRESH_THRESHOLD_SECONDS = 60 * 60 * 24 * 7;
 
-// Помимо основного продакшен-алиаса Vercel-проект отдаёт ещё несколько
-// доменов (team-alias, git-branch alias, per-deploy URL) — у них СВОЙ
-// cookie jar, сессия с одного не видна на другом. Все они требуют Vercel SSO
-// и реальным пользователям недоступны, но домен на всякий случай
-// канонизируем — если пользователь всё же попадёт на другой алиас (старая
-// ссылка, кэш и т.п.), редиректим на канонический до применения сессии.
-const CANONICAL_HOST = "two-fins-kabinet.vercel.app";
+// На Vercel один проект отдавал несколько доменов (team-alias, git-branch
+// alias, per-deploy URL) со своим cookie jar на каждом — редирект на
+// канонический хост чинил сессию, если пользователь попадал не туда. На
+// Timeweb такой проблемы нет (один домен на приложение), поэтому редирект —
+// опциональный: включается только если задан CANONICAL_HOST.
+const CANONICAL_HOST = process.env.CANONICAL_HOST;
 
 export const config = {
   matcher: [
@@ -28,7 +27,7 @@ export const config = {
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host");
-  if (process.env.NODE_ENV === "production" && host && host !== CANONICAL_HOST) {
+  if (process.env.NODE_ENV === "production" && CANONICAL_HOST && host && host !== CANONICAL_HOST) {
     const url = request.nextUrl.clone();
     url.protocol = "https";
     url.host = CANONICAL_HOST;

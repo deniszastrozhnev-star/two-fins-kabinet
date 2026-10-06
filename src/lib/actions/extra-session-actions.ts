@@ -1,38 +1,42 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
+import { applyChildGroupChange } from "@/lib/childGroupChange";
 
-export async function addExtraSessionEntitlementAction(formData: FormData) {
+export type ChildGroupActionState = { error?: string; success?: string } | undefined;
+
+/** Тот же конструктор, что в онлайн-записи: группа (по листу ожидания при
+ * нехватке мест) + не более одного доп. занятия в группе того же бассейна,
+ * с числом занятий в неделю, производным от расписания выбранной группы
+ * (как и при онлайн-записи, а не произвольным числом от тренера). */
+export async function updateChildGroupAction(
+  _prevState: ChildGroupActionState,
+  formData: FormData,
+): Promise<ChildGroupActionState> {
   await requireTrainer();
 
   const childId = String(formData.get("childId") ?? "");
   const groupId = String(formData.get("groupId") ?? "");
-  const sessionsPerWeek = Number(formData.get("sessionsPerWeek") ?? "");
+  const extraGroupId = String(formData.get("extraGroupId") ?? "") || null;
+  if (!childId) return { error: "Не найден ребёнок" };
 
-  if (!childId) throw new Error("Не найден ребёнок");
-  if (!groupId || !Number.isFinite(sessionsPerWeek) || sessionsPerWeek <= 0) {
-    throw new Error("Выберите группу и укажите число занятий в неделю");
+  const result = await applyChildGroupChange(childId, groupId, extraGroupId);
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath("/trainer/children");
+  revalidatePath(`/trainer/children/${childId}`);
+  revalidatePath("/trainer/schedule");
+  revalidatePath("/parent", "layout");
+
+  if (!groupId) {
+    return { success: "Ребёнок убран из группы." };
   }
 
-  await prisma.extraSessionEntitlement.upsert({
-    where: { childId_groupId: { childId, groupId } },
-    update: { sessionsPerWeek: Math.round(sessionsPerWeek) },
-    create: { childId, groupId, sessionsPerWeek: Math.round(sessionsPerWeek) },
-  });
+  const priceText = `Тариф пересчитан: ${result.price!.toLocaleString("ru-RU")}₽/мес.`;
+  const waitlistText = result.waitlisted
+    ? " Мест в группе сейчас нет — ребёнок добавлен в лист ожидания."
+    : "";
 
-  revalidatePath(`/trainer/children/${childId}`);
-}
-
-export async function deleteExtraSessionEntitlementAction(formData: FormData) {
-  await requireTrainer();
-
-  const id = String(formData.get("id") ?? "");
-  const childId = String(formData.get("childId") ?? "");
-  if (!id) throw new Error("Не найдена запись");
-
-  await prisma.extraSessionEntitlement.delete({ where: { id } });
-
-  revalidatePath(`/trainer/children/${childId}`);
+  return { success: `Сохранено. ${priceText}${waitlistText}` };
 }

@@ -6,40 +6,74 @@ import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatPhone } from "@/lib/phone";
 import { formatDateRu } from "@/lib/dates";
+import {
+  formatDayMonth,
+  formatLessonsCount,
+  getChildrenWithoutPayment,
+  type UnpaidChild,
+} from "@/lib/unpaidAttendance";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { LinkButton } from "@/components/ui/Button";
-import { SearchBox } from "@/components/trainer/SearchBox";
+import { ChildrenList, type ChildListItem } from "@/components/trainer/ChildrenList";
 
-// Ъ и Ь не встречаются как первая буква фамилии — не включаем в указатель.
-const RUSSIAN_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ".split("");
+const PENDING_VISIBLE = 8;
+const UNPAID_VISIBLE = 8;
 
-export default async function ChildrenPage({
-  searchParams,
+function UnpaidChildRow({ row }: { row: UnpaidChild }) {
+  return (
+    <li>
+      <Link
+        href={`/trainer/children/${row.id}`}
+        className="flex flex-col gap-0.5 py-2.5 hover:bg-white/5"
+      >
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <span className="min-w-0 break-words font-medium">
+            {row.lastName} {row.firstName}
+          </span>
+          <span className="text-xs font-medium text-red-300">
+            без оплаты: {formatLessonsCount(row.unpaid)}
+          </span>
+        </span>
+        <span className="text-xs text-brand-text/60">
+          {row.groupName ?? "без группы"} · последнее занятие {formatDayMonth(row.lastPresent)} ·{" "}
+          {row.paidUntil ? `оплачено до ${formatDayMonth(row.paidUntil)}` : "не оплачивал"}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function PendingReceiptRow({
+  row,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  row: { id: string; name: string; latest: Date; count: number };
 }) {
+  return (
+    <li>
+      <Link
+        href={`/trainer/children/${row.id}`}
+        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 hover:bg-white/5"
+      >
+        <span className="min-w-0 break-words font-medium">{row.name}</span>
+        <span className="text-xs text-brand-text/60">
+          чек от {formatDateRu(row.latest)}
+          {row.count > 1 ? ` · всего ${row.count}` : ""}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+export default async function ChildrenPage() {
   const trainer = await requireTrainer();
-  const { q } = await searchParams;
 
   const [children, totalChildren, allForDuplicateCheck] = await Promise.all([
     prisma.child.findMany({
-      where: q
-        ? {
-            OR: [
-              { lastName: { contains: q, mode: "insensitive" } },
-              { firstName: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
       include: { group: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.child.count(),
-    // Дубликаты ищем по ВСЕЙ базе, а не по текущему (возможно, отфильтрованному
-    // поиском) списку — иначе поиск мог бы случайно скрыть одну из пары.
     trainer.role === "HEAD"
       ? prisma.child.findMany({
           select: {
@@ -74,11 +108,19 @@ export default async function ChildrenPage({
   const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
   const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
-  const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
+  const [balances, unviewedReceipts, pendingReceipts, certificates, contracts, unpaidChildren] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
       select: { childId: true },
+    }),
+    // Чек загружен, но тренер ещё не подтвердил оплату (resolvedAt пуст) —
+    // даже если карточку уже открывали (viewedAt не пуст): работа с чеком не
+    // закончена. Идёт в отдельный блок наверху, порядок основного списка не трогаем.
+    prisma.paymentReceipt.findMany({
+      where: { resolvedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { childId: true, createdAt: true },
     }),
     prisma.medicalCertificate.findMany({
       where: { childId: { in: children.map((c) => c.id) } },
@@ -89,8 +131,26 @@ export default async function ChildrenPage({
       where: { childId: { in: children.map((c) => c.id) } },
       select: { childId: true },
     }),
+    // Отдельный блок наверху (порядок основного списка не трогаем): дети с
+    // отметками «Пришёл» позже срока оплаты, см. lib/unpaidAttendance.ts.
+    getChildrenWithoutPayment(),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
+
+  // Один ребёнок — одна строка блока: дата самого свежего неподтверждённого чека
+  // (pendingReceipts уже отсортирован от новых к старым) и сколько их всего.
+  const childById = new Map(children.map((c) => [c.id, c]));
+  const pendingByChild = new Map<string, { latest: Date; count: number }>();
+  for (const r of pendingReceipts) {
+    if (!childById.has(r.childId)) continue;
+    const entry = pendingByChild.get(r.childId);
+    if (entry) entry.count += 1;
+    else pendingByChild.set(r.childId, { latest: r.createdAt, count: 1 });
+  }
+  const pendingRows = [...pendingByChild.entries()].map(([childId, info]) => {
+    const c = childById.get(childId)!;
+    return { id: childId, name: `${c.lastName} ${c.firstName}`, ...info };
+  });
   const latestValidUntilByChild = new Map<string, Date>();
   for (const cert of certificates) {
     if (!latestValidUntilByChild.has(cert.childId)) {
@@ -115,17 +175,22 @@ export default async function ChildrenPage({
     return a.child.firstName.localeCompare(b.child.firstName, "ru");
   });
 
-  // Первое появление каждой буквы в ТЕКУЩЕМ порядке списка (а не в чисто
-  // алфавитном) — список сначала показывает детей с проблемами, поэтому буква
-  // может встречаться дважды (в группе "проблемы" и в группе "всё ок");
-  // указатель ведёт к первому вхождению.
-  const firstIdByLetter = new Map<string, string>();
-  for (const { child } of enrichedChildren) {
-    const letter = child.lastName[0]?.toUpperCase();
-    if (letter && !firstIdByLetter.has(letter)) {
-      firstIdByLetter.set(letter, child.id);
-    }
-  }
+  const listItems: ChildListItem[] = enrichedChildren.map(
+    ({ child, paymentOk, medicalOk, contractOk }) => ({
+      id: child.id,
+      lastName: child.lastName,
+      firstName: child.firstName,
+      groupName: child.group?.name ?? null,
+      phone: formatPhone(child.parentPhone),
+      balance: balances.get(child.id) ?? 0,
+      isDuplicate: duplicateChildIds.has(child.id),
+      isSick: child.status === "SICK",
+      hasNewReceipt: childrenWithNewReceipt.has(child.id),
+      paymentOk,
+      medicalOk,
+      contractOk,
+    }),
+  );
 
   return (
     <>
@@ -169,98 +234,61 @@ export default async function ChildrenPage({
         </Card>
       )}
 
-      <div className="mb-5 max-w-sm">
-        <SearchBox action="/trainer/children" defaultValue={q} placeholder="Поиск по имени…" />
-      </div>
-
-      {children.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1">
-          {RUSSIAN_ALPHABET.map((letter) => {
-            const targetId = firstIdByLetter.get(letter);
-            return targetId ? (
-              <a
-                key={letter}
-                href={`#child-${targetId}`}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-semibold text-brand-cyan transition hover:bg-white/10"
-              >
-                {letter}
-              </a>
-            ) : (
-              <span
-                key={letter}
-                className="flex h-7 w-7 items-center justify-center text-xs font-semibold text-brand-text/25"
-              >
-                {letter}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {children.length === 0 ? (
-        <EmptyState
-          title={q ? "Никого не нашлось" : "Пока нет ни одного ребёнка"}
-          description={
-            q
-              ? "Попробуйте изменить запрос."
-              : "Добавьте первого ученика, чтобы начать вести посещаемость и оплату."
-          }
-          action={
-            !q && (
-              <LinkButton href="/trainer/children/new">Добавить ребёнка</LinkButton>
-            )
-          }
-        />
-      ) : (
-        <Card>
-          <CardBody className="flex flex-col divide-y divide-white/10 p-0">
-            {enrichedChildren.map(({ child, paymentOk, medicalOk, contractOk }) => {
-              const balance = balances.get(child.id) ?? 0;
-              return (
-                <Link
-                  key={child.id}
-                  id={`child-${child.id}`}
-                  href={`/trainer/children/${child.id}`}
-                  className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/5 sm:px-5"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {child.lastName} {child.firstName}
-                    </p>
-                    <p className="text-xs text-brand-text/50">
-                      {child.group?.name ?? "Без группы"} ·{" "}
-                      {formatPhone(child.parentPhone)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {duplicateChildIds.has(child.id) && (
-                      <Badge tone="amber">Возможный дубликат</Badge>
-                    )}
-                    {child.status === "SICK" && (
-                      <Badge tone="violet">болеет</Badge>
-                    )}
-                    {childrenWithNewReceipt.has(child.id) && (
-                      <Badge tone="violet">есть чек</Badge>
-                    )}
-                    {balance > 0 && (
-                      <Badge tone="amber">{balance} отраб.</Badge>
-                    )}
-                    <Badge tone={paymentOk ? "green" : "red"}>
-                      Оплата {paymentOk ? "✅" : "❌"}
-                    </Badge>
-                    <Badge tone={medicalOk ? "green" : "red"}>
-                      Справка {medicalOk ? "✅" : "❌"}
-                    </Badge>
-                    <Badge tone={contractOk ? "green" : "red"}>
-                      Договор {contractOk ? "✅" : "❌"}
-                    </Badge>
-                  </div>
-                </Link>
-              );
-            })}
+      {pendingRows.length > 0 && (
+        <Card className="mb-5 border-brand-violet/30 bg-brand-violet/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold">
+              Чеки на проверке ({pendingRows.length})
+            </h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {pendingRows.slice(0, PENDING_VISIBLE).map((r) => (
+                <PendingReceiptRow key={r.id} row={r} />
+              ))}
+            </ul>
+            {pendingRows.length > PENDING_VISIBLE && (
+              <details className="mt-1">
+                <summary className="cursor-pointer py-2 text-sm text-brand-cyan">
+                  Показать ещё {pendingRows.length - PENDING_VISIBLE}
+                </summary>
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {pendingRows.slice(PENDING_VISIBLE).map((r) => (
+                    <PendingReceiptRow key={r.id} row={r} />
+                  ))}
+                </ul>
+              </details>
+            )}
           </CardBody>
         </Card>
       )}
+
+      {unpaidChildren.length > 0 && (
+        <Card className="mb-5 border-red-500/30 bg-red-500/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold text-red-200">
+              Ходят без оплаты ({unpaidChildren.length})
+            </h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {unpaidChildren.slice(0, UNPAID_VISIBLE).map((r) => (
+                <UnpaidChildRow key={r.id} row={r} />
+              ))}
+            </ul>
+            {unpaidChildren.length > UNPAID_VISIBLE && (
+              <details className="mt-1">
+                <summary className="cursor-pointer py-2 text-sm text-brand-cyan">
+                  Показать ещё {unpaidChildren.length - UNPAID_VISIBLE}
+                </summary>
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {unpaidChildren.slice(UNPAID_VISIBLE).map((r) => (
+                    <UnpaidChildRow key={r.id} row={r} />
+                  ))}
+                </ul>
+              </details>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      <ChildrenList items={listItems} />
     </>
   );
 }

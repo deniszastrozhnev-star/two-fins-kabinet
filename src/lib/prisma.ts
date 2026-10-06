@@ -5,15 +5,16 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// max: node-postgres по умолчанию держит до 10 соединений на один Pool — на
-// Vercel serverless каждый холодный инстанс функции создаёт свой отдельный Pool,
-// так что при N параллельных инстансах это до N×10 соединений в сторону Neon
-// одновременно. Neon-пуллер (PgBouncer) сам мультиплексирует много клиентов на
-// малое число серверных соединений, но локальный Pool стоит держать маленьким,
-// чтобы не забивать его лишними простаивающими соединениями — 5 с запасом
-// покрывает самый широкий Promise.all в проекте (getAthleteLeaderboard, 7
-// запросов, из которых часть — Promise.resolve([]) без реального соединения).
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL!, max: 5 });
+// max: раньше было 5 — расчёт под Vercel serverless, где каждый холодный
+// инстанс функции держит свой отдельный Pool, так что даже маленький max
+// умножается на N параллельных инстансов. На Timeweb Cloud приложение — один
+// долгоживущий Node-процесс (см. instrumentation.ts), а не десятки serverless-
+// инстансов, поэтому 5 соединений на ВЕСЬ сайт разом — это узкое место: при
+// нескольких одновременных пользователях запросы к БД выстраиваются в очередь
+// на свободное соединение из пула, что ощущается как случайные подвисания и
+// неудачные загрузки страниц, особенно на медленном мобильном соединении.
+// У Postgres на Timeweb max_connections = 200 — большой запас, подняли до 20.
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL!, max: 20 });
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 

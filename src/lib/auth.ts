@@ -72,6 +72,17 @@ export const requireParentChild = cache(async () => {
   return child;
 });
 
+/** То же самое + все дети этой семьи (по телефону, включая активного) — для
+ * переключателя и сводки на первом экране кабинета родителя. */
+export const requireParentFamily = cache(async () => {
+  const child = await requireParentChild();
+  const siblings = await prisma.child.findMany({
+    where: { parentPhone: child.parentPhone },
+    orderBy: [{ firstName: "asc" }],
+  });
+  return { child, siblings };
+});
+
 /** Требует сессию спортсмена в Server Component/Action; иначе редиректит на /athlete-login. Возвращает спортсмена. */
 export const requireAthlete = cache(async () => {
   const session = await getSession();

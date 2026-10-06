@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { requireParentChild } from "@/lib/auth";
-import { getWorkoffBalance } from "@/lib/workoffs";
+import { requireParentFamily } from "@/lib/auth";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
-import { getActiveStoriesFeed } from "@/lib/stories";
-import { COURSE_RESULT_NAME } from "@/lib/courseResults";
-import { formatDateRu } from "@/lib/dates";
+import { formatDateRu, parseDateInputValue } from "@/lib/dates";
+import { nextUpcomingSession } from "@/lib/sessionTiming";
+import { computeCombinedPrice } from "@/lib/registrationTariffs";
 import { LEVEL_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -13,7 +12,11 @@ import { Badge } from "@/components/ui/Badge";
 import { ReceiptUploadForm } from "@/components/parent/ReceiptUploadForm";
 import { MedicalCertificateUpload } from "@/components/parent/MedicalCertificateUpload";
 import { ContractUpload } from "@/components/parent/ContractUpload";
-import { StoryRail } from "@/components/shared/StoryRail";
+import { FamilySummaryCard } from "@/components/parent/FamilySummaryCard";
+import { UnseenEventBanner } from "@/components/parent/UnseenEventBanner";
+import { TodayAbsenceButton } from "@/components/parent/TodayAbsenceButton";
+import { ParentGroupChangeForm } from "@/components/parent/ParentGroupChangeForm";
+import type { ChildGroupOption } from "@/components/shared/GroupPicker";
 
 // Загрузка договора/чека/справки — фото с телефона (несколько МБ, sharp
 // перекодирует в JPEG) — на Vercel по умолчанию Server Action может упереться
@@ -25,10 +28,10 @@ const SBP_LINK =
   "https://qr.nspk.ru/AS1A00334PI5FGEA93GRK6JQO8NGMG81?type=01&bank=100000000284&crc=B5A0%3E";
 
 export default async function ParentOverviewPage() {
-  const child = await requireParentChild();
-  const [balance, payment, latestCertificate, latestContract, results, storiesFeed] =
+  const { child, siblings } = await requireParentFamily();
+  const nextSession = child.group ? nextUpcomingSession(child.group) : null;
+  const [payment, latestCertificate, latestContract, latestEvent, familyRows, groups, currentExtra, nextNotice] =
     await Promise.all([
-      getWorkoffBalance(child.id),
       Promise.resolve(getPaymentStatus(child.paidUntil)),
       prisma.medicalCertificate.findFirst({
         where: { childId: child.id },
@@ -38,16 +41,89 @@ export default async function ParentOverviewPage() {
         where: { childId: child.id },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.competitionResult.findMany({
-        where: { childId: child.id, competitionName: { not: COURSE_RESULT_NAME } },
-        orderBy: { date: "desc" },
+      prisma.event.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { title: true, description: true, createdAt: true },
       }),
-      getActiveStoriesFeed({ role: "parent", id: child.id }),
+      siblings.length > 1
+        ? Promise.all(
+            siblings.map(async (s) => {
+              const [cert, contract] = await Promise.all([
+                prisma.medicalCertificate.findFirst({
+                  where: { childId: s.id },
+                  orderBy: { createdAt: "desc" },
+                  select: { validUntil: true },
+                }),
+                prisma.contractDocument.findFirst({
+                  where: { childId: s.id },
+                  select: { id: true },
+                }),
+              ]);
+              return {
+                id: s.id,
+                name: `${s.lastName} ${s.firstName}`,
+                isActive: s.id === child.id,
+                payment: getPaymentStatus(s.paidUntil),
+                medical: getMedicalStatus(cert?.validUntil ?? null),
+                contractUploaded: contract != null,
+              };
+            }),
+          )
+        : Promise.resolve([]),
+      prisma.group.findMany({
+        orderBy: [{ level: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          level: true,
+          pool: true,
+          time: true,
+          pricePerMonth: true,
+          daysOfWeek: true,
+        },
+      }),
+      prisma.extraSessionEntitlement.findFirst({
+        where: { childId: child.id },
+        select: { groupId: true, group: { select: { pool: true, pricePerMonth: true, daysOfWeek: true } } },
+      }),
+      child.groupId && nextSession
+        ? prisma.parentAbsenceNotice.findUnique({
+            where: {
+              childId_groupId_date: {
+                childId: child.id,
+                groupId: child.groupId,
+                date: parseDateInputValue(nextSession.dateInputValue),
+              },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
     ]);
   const medicalStatus = getMedicalStatus(latestCertificate?.validUntil ?? null);
+  const isEventUnseen =
+    latestEvent != null && (!child.lastSeenEventsAt || latestEvent.createdAt > child.lastSeenEventsAt);
+
+  const currentPrice = child.group
+    ? computeCombinedPrice(child.group, currentExtra?.group ?? null)
+    : null;
+  const nextSessionLabel = nextSession
+    ? `${nextSession.weekday}, ${formatDateRu(parseDateInputValue(nextSession.dateInputValue), "d MMMM")}`
+    : null;
 
   return (
     <>
+      {familyRows.length > 1 && (
+        <div className="mb-6">
+          <FamilySummaryCard rows={familyRows} />
+        </div>
+      )}
+
+      {isEventUnseen && latestEvent && (
+        <div className="mb-6">
+          <UnseenEventBanner title={latestEvent.title} description={latestEvent.description} />
+        </div>
+      )}
+
       <PageHeader
         title="Обзор"
         description={
@@ -55,30 +131,7 @@ export default async function ParentOverviewPage() {
             ? `${child.group.name} · ${LEVEL_LABELS[child.group.level]}`
             : "Группа пока не назначена"
         }
-        action={
-          child.group?.chatUrl ? (
-            <a
-              href={child.group.chatUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-violet px-4 py-2.5 text-sm font-semibold text-brand-text transition hover:brightness-110"
-            >
-              Вступить в чат группы
-            </a>
-          ) : undefined
-        }
       />
-
-      <Card className="mb-6">
-        <CardBody>
-          <h2 className="mb-3 font-heading text-lg font-bold">Истории</h2>
-          <StoryRail
-            feed={storiesFeed}
-            ownName={`Родители ${child.lastName} ${child.firstName}`}
-            ownAvatarUrl={null}
-          />
-        </CardBody>
-      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="scroll-mt-24" id="payment">
@@ -95,17 +148,46 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        <Card>
+        <Card className="scroll-mt-24" id="schedule">
           <CardBody>
-            <p className="text-sm text-brand-text/60">Доступные отработки</p>
-            <p className="mt-2 font-heading text-3xl font-bold text-brand-cyan">
-              {balance > 0 ? balance : 0}
-            </p>
-            <p className="mt-3 text-xs text-brand-text/50">
-              {balance > 0
-                ? "Посмотрите, куда прийти, на вкладке «Отработки»"
-                : "Пропущенных занятий, требующих отработки, нет"}
-            </p>
+            <p className="text-sm text-brand-text/60">Расписание</p>
+            {child.group ? (
+              <>
+                <p className="mt-2 font-heading text-xl font-bold">{child.group.name}</p>
+                <p className="mt-1 text-sm text-brand-text/70">
+                  {child.group.daysOfWeek.join(", ")} · {child.group.time}
+                </p>
+                <p className="mt-1 text-sm text-brand-text/50">{child.group.pool}</p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-brand-text/50">
+                Группа пока не назначена — уточните у тренера
+              </p>
+            )}
+
+            {nextSessionLabel && (
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <TodayAbsenceButton
+                  key={nextSession?.dateInputValue}
+                  alreadyNotified={nextNotice != null}
+                  sessionLabel={nextSessionLabel}
+                />
+              </div>
+            )}
+
+            <details className="mt-4 border-t border-white/10 pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-brand-cyan">
+                Сменить группу
+              </summary>
+              <div className="mt-3">
+                <ParentGroupChangeForm
+                  groups={groups as ChildGroupOption[]}
+                  currentGroupId={child.groupId}
+                  currentExtraGroupId={currentExtra?.groupId ?? null}
+                  currentPrice={currentPrice}
+                />
+              </div>
+            </details>
           </CardBody>
         </Card>
 
@@ -141,7 +223,7 @@ export default async function ParentOverviewPage() {
           </CardBody>
         </Card>
 
-        <Card className="scroll-mt-24 sm:col-span-2" id="contract">
+        <Card className="scroll-mt-24 sm:col-span-2" id="documents">
           <CardBody>
             <p className="text-sm text-brand-text/60">Медицинские документы</p>
             <p className="mt-2 text-sm text-brand-text/70">
@@ -194,28 +276,6 @@ export default async function ParentOverviewPage() {
                 <ContractUpload />
               </div>
             </div>
-          </CardBody>
-        </Card>
-
-        <Card className="scroll-mt-24 sm:col-span-2" id="results">
-          <CardBody>
-            <p className="mb-2 text-sm text-brand-text/60">
-              Результаты соревнований
-            </p>
-            {results.length === 0 ? (
-              <p className="text-sm text-brand-text/50">Результатов пока нет</p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-white/10">
-                {results.map((r) => (
-                  <li key={r.id} className="py-2">
-                    <p className="text-sm font-medium">{r.competitionName}</p>
-                    <p className="text-xs text-brand-text/50">
-                      {formatDateRu(r.date)} · {r.result}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
           </CardBody>
         </Card>
       </div>

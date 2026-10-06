@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { getWorkoffBalance } from "@/lib/workoffs";
+import { getChildTariffRub } from "@/lib/payments";
 import { getPaymentStatus } from "@/lib/payment";
 import { getMedicalStatus } from "@/lib/medical";
 import { formatDateRu } from "@/lib/dates";
@@ -17,21 +18,44 @@ import {
   addCompetitionResultAction,
   deleteCompetitionResultAction,
 } from "@/lib/actions/competition-actions";
-import {
-  addExtraSessionEntitlementAction,
-  deleteExtraSessionEntitlementAction,
-} from "@/lib/actions/extra-session-actions";
-import { getKnownTariffs } from "@/lib/tariffs";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input, FieldGroup, Select } from "@/components/ui/Field";
+import { Input, FieldGroup } from "@/components/ui/Field";
 import { ChildForm } from "@/components/trainer/ChildForm";
+import { ChildGroupForm } from "@/components/trainer/ChildGroupForm";
 import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ReceiptTariffPrompt } from "@/components/trainer/ReceiptTariffPrompt";
+
+/** Текущая группа ребёнка одной строкой: название, дни и время, бассейн. */
+function CurrentGroupSummary({
+  group,
+  bare = false,
+}: {
+  group: { name: string; daysOfWeek: string[]; time: string; pool: string } | null;
+  bare?: boolean;
+}) {
+  const body = group ? (
+    <>
+      <p className="font-medium">{group.name}</p>
+      <p className="text-sm text-brand-text/60">
+        {group.daysOfWeek.join(", ")} · {group.time} · {group.pool}
+      </p>
+    </>
+  ) : (
+    <p className="font-medium text-brand-text/60">Без группы</p>
+  );
+  if (bare) return <div>{body}</div>;
+  return (
+    <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5">
+      <p className="mb-1 text-xs uppercase tracking-wide text-brand-text/50">Группа</p>
+      {body}
+    </div>
+  );
+}
 
 export default async function ChildDetailPage({
   params,
@@ -54,12 +78,19 @@ export default async function ChildDetailPage({
     certificates,
     contracts,
     results,
-    tariffs,
     extraSessions,
   ] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        pool: true,
+        time: true,
+        pricePerMonth: true,
+        daysOfWeek: true,
+      },
     }),
     getWorkoffBalance(id),
     prisma.attendanceRecord.findMany({
@@ -87,7 +118,6 @@ export default async function ChildDetailPage({
       where: { childId: id },
       orderBy: { date: "desc" },
     }),
-    getKnownTariffs(),
     prisma.extraSessionEntitlement.findMany({
       where: { childId: id },
       include: { group: true },
@@ -95,7 +125,14 @@ export default async function ChildDetailPage({
   ]);
 
   const payment = getPaymentStatus(child.paidUntil);
+  const tariffRub = await getChildTariffRub(child.id);
   const medicalStatus = getMedicalStatus(certificates[0]?.validUntil ?? null);
+  const currentGroup = groups.find((g) => g.id === child.groupId) ?? null;
+  // Конструктор группы на карточке стоит в двух местах (рядом с ФИО и в блоке
+  // оплаты) — у каждого своё локальное состояние выбора. После сохранения в
+  // одном из них ключ меняется, и второй пересоздаётся с актуальной группой,
+  // иначе его устаревший выбор можно было бы сохранить поверх нового.
+  const groupFormKey = `${child.groupId ?? "none"}:${extraSessions[0]?.groupId ?? "none"}`;
 
   return (
     <>
@@ -124,26 +161,43 @@ export default async function ChildDetailPage({
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-heading text-lg font-bold">
-              Данные ребёнка
-            </h2>
-            <ChildForm
-              action={updateChildAction}
-              groups={groups}
-              initial={{
-                id: child.id,
-                lastName: child.lastName,
-                firstName: child.firstName,
-                groupId: child.groupId,
-                parentPhone: child.parentPhone,
-                paidUntil: child.paidUntil,
-                birthDate: child.birthDate,
-              }}
-            />
-          </CardBody>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardBody>
+              <h2 className="mb-4 font-heading text-lg font-bold">
+                Данные ребёнка
+              </h2>
+              <CurrentGroupSummary group={currentGroup} />
+              <ChildForm
+                action={updateChildAction}
+                groups={groups}
+                hideGroupField
+                initial={{
+                  id: child.id,
+                  lastName: child.lastName,
+                  firstName: child.firstName,
+                  groupId: child.groupId,
+                  parentPhone: child.parentPhone,
+                  paidUntil: child.paidUntil,
+                  birthDate: child.birthDate,
+                }}
+              />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody>
+              <h2 className="mb-3 font-heading text-lg font-bold">Группа и доп. занятие</h2>
+              <ChildGroupForm
+                key={groupFormKey}
+                childId={child.id}
+                groups={groups}
+                currentGroupId={child.groupId}
+                currentExtraGroupId={extraSessions[0]?.groupId ?? null}
+              />
+            </CardBody>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-6">
           <Card>
@@ -168,70 +222,29 @@ export default async function ChildDetailPage({
                 </form>
               </div>
               <div className="mt-4 border-t border-white/10 pt-4">
+                <p className="mb-2 text-sm text-brand-text/60">Группа</p>
+                <CurrentGroupSummary group={currentGroup} bare />
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-brand-cyan">
+                    Сменить группу
+                  </summary>
+                  <div className="mt-3">
+                    <ChildGroupForm
+                      key={groupFormKey}
+                      childId={child.id}
+                      groups={groups}
+                      currentGroupId={child.groupId}
+                      currentExtraGroupId={extraSessions[0]?.groupId ?? null}
+                    />
+                  </div>
+                </details>
+              </div>
+              <div className="mt-4 border-t border-white/10 pt-4">
                 <p className="text-sm text-brand-text/60">Остаток отработок</p>
                 <p className="mt-1 font-heading text-2xl font-bold text-brand-cyan">
                   {balance > 0 ? balance : 0}
                 </p>
               </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <h2 className="mb-3 font-heading text-lg font-bold">Доп. занятие</h2>
-              <form
-                action={addExtraSessionEntitlementAction}
-                className="mb-4 flex flex-col gap-3 border-b border-white/10 pb-4"
-              >
-                <input type="hidden" name="childId" value={child.id} />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FieldGroup label="Группа" htmlFor="extraGroupId">
-                    <Select id="extraGroupId" name="groupId" defaultValue="">
-                      <option value="" disabled>
-                        Выберите группу…
-                      </option>
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </FieldGroup>
-                  <FieldGroup label="Занятий в неделю" htmlFor="sessionsPerWeek">
-                    <Input
-                      id="sessionsPerWeek"
-                      name="sessionsPerWeek"
-                      type="number"
-                      min={1}
-                      defaultValue={1}
-                      required
-                    />
-                  </FieldGroup>
-                </div>
-                <div className="flex justify-end">
-                  <SaveButton>Добавить</SaveButton>
-                </div>
-              </form>
-              {extraSessions.length === 0 ? (
-                <p className="text-sm text-brand-text/50">Доп. занятий не назначено.</p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-white/10">
-                  {extraSessions.map((e) => (
-                    <li key={e.id} className="flex items-center justify-between gap-3 py-2">
-                      <p className="text-sm">
-                        {e.group.name} · {e.sessionsPerWeek}×/нед
-                      </p>
-                      <form action={deleteExtraSessionEntitlementAction}>
-                        <input type="hidden" name="id" value={e.id} />
-                        <input type="hidden" name="childId" value={child.id} />
-                        <ConfirmSubmitButton confirmMessage="Убрать доп. занятие?">
-                          Удалить
-                        </ConfirmSubmitButton>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </CardBody>
           </Card>
 
@@ -244,10 +257,6 @@ export default async function ChildDetailPage({
                 <ul className="flex flex-col divide-y divide-white/10">
                   {receipts.map((r) => {
                     const isImage = r.contentType?.startsWith("image/");
-                    const tariffMatch =
-                      r.recognizedAmount != null
-                        ? tariffs.find((t) => t.amount === r.recognizedAmount)
-                        : undefined;
                     return (
                       <li key={r.id} className="flex flex-col gap-2 py-2">
                         <div className="flex items-center gap-3">
@@ -282,16 +291,9 @@ export default async function ChildDetailPage({
                             {isImage ? "Открыть →" : "Открыть PDF →"}
                           </a>
                         </div>
-                        {r.recognizedAmount != null &&
-                          !r.resolvedAt &&
-                          tariffMatch && (
-                            <ReceiptTariffPrompt
-                              receiptId={r.id}
-                              childId={child.id}
-                              recognizedAmount={r.recognizedAmount}
-                              tariffLabel={tariffMatch.label}
-                            />
-                          )}
+                        {!r.resolvedAt && (
+                          <ReceiptTariffPrompt receiptId={r.id} childId={child.id} tariffRub={tariffRub} />
+                        )}
                       </li>
                     );
                   })}

@@ -3,9 +3,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireTrainer } from "@/lib/auth";
 import { toDateInputValue, parseDateInputValue } from "@/lib/dates";
-import { getPaymentStatus } from "@/lib/payment";
+import {
+  formatDayMonth,
+  formatLessonsCount,
+  getAttendanceDebtForChildren,
+} from "@/lib/unpaidAttendance";
 import { saveAttendanceAction } from "@/lib/actions/attendance-actions";
 import { saveCourseResultsAction } from "@/lib/actions/course-actions";
+import { COURSE_RESULT_NAME } from "@/lib/courseResults";
 import { COURSE_DISTANCES } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -15,16 +20,35 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Field";
 import { AttendanceDateFilter } from "@/components/trainer/AttendanceDateFilter";
 import { AttendanceStatusPicker } from "@/components/trainer/AttendanceStatusPicker";
+import { AttendanceStatusProvider, AttendancePresentCounter } from "@/components/trainer/AttendanceProgress";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 
-function paymentLabel(paidUntil: Date | null): string {
-  if (!paidUntil) return "не оплачено";
-  const status = getPaymentStatus(paidUntil);
-  if (status.tone === "red") return "оплата просрочена";
-  const dd = String(paidUntil.getUTCDate()).padStart(2, "0");
-  const mm = String(paidUntil.getUTCMonth() + 1).padStart(2, "0");
-  return `оплачено до ${dd}.${mm}`;
+/** Покрывает ли оплата ДАТУ ЭТОГО занятия (а не сегодняшний день): занятие
+ * можно отмечать задним числом, и оплата, которая была действительна на ту
+ * дату, должна считаться оплатой. paidUntil и date — @db.Date, полночь UTC. */
+function paidCoversSession(paidUntil: Date | null, sessionDate: Date): boolean {
+  return paidUntil != null && paidUntil.getTime() >= sessionDate.getTime();
+}
+
+function PaymentMark({ paid }: { paid: boolean }) {
+  return (
+    <span
+      role="img"
+      aria-label={paid ? "Оплата покрывает это занятие" : "Оплаты на это занятие нет"}
+      title={paid ? "Оплата покрывает дату занятия" : "Нет оплаты на дату занятия"}
+      className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+        paid ? "bg-emerald-500/25 text-emerald-300" : "bg-red-500/25 text-red-300"
+      }`}
+    >
+      {paid ? "✓" : "✕"}
+    </span>
+  );
+}
+
+function paymentLabel(paidUntil: Date | null, lastPresent: Date | null): string {
+  const paid = paidUntil ? `оплачено до ${formatDayMonth(paidUntil)}` : "не оплачено";
+  return lastPresent ? `${paid} · последнее занятие ${formatDayMonth(lastPresent)}` : paid;
 }
 
 export default async function AttendanceGroupPage({
@@ -50,7 +74,7 @@ export default async function AttendanceGroupPage({
     searchParamsResolved.conflicts ? searchParamsResolved.conflicts.split(",") : [],
   );
 
-  const [children, records] = await Promise.all([
+  const [children, records, courseResultsToday, absenceNotices] = await Promise.all([
     prisma.child.findMany({
       where: { groupId },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -60,8 +84,23 @@ export default async function AttendanceGroupPage({
       where: { groupId, date },
       include: { child: true, markedByTrainer: { select: { username: true, displayName: true } } },
     }),
+    prisma.competitionResult.findMany({
+      where: { date, competitionName: COURSE_RESULT_NAME },
+      select: { childId: true },
+    }),
+    prisma.parentAbsenceNotice.findMany({
+      where: { groupId, date },
+      select: { childId: true },
+    }),
   ]);
+  const debtByChildId = await getAttendanceDebtForChildren(children.map((c) => c.id));
   const recordByChildId = new Map(records.map((r) => [r.childId, r]));
+  // Пришедшая через кабинет родителя пометка "не придём" — актуальна, только
+  // пока по этому дню/группе нет отдельной отметки тренера (см. workoffs.ts).
+  const notifiedChildIds = new Set(
+    absenceNotices.filter((n) => !recordByChildId.has(n.childId)).map((n) => n.childId),
+  );
+  const childIdsWithCourseResultToday = new Set(courseResultsToday.map((r) => r.childId));
   const homeChildIds = new Set(children.map((c) => c.id));
   // Дети из других групп, пришедшие на это занятие отработать/доп. занятием — добавлены через /trainer/workoffs
   const workoffVisitors = records.filter(
@@ -143,6 +182,11 @@ export default async function AttendanceGroupPage({
         </CardBody>
       </Card>
 
+      <AttendanceStatusProvider
+        initial={Object.fromEntries(children.map((c) => [c.id, recordByChildId.get(c.id)?.status ?? null]))}
+      >
+      <AttendancePresentCounter />
+
       <Card className="mb-6">
         <CardBody>
           <h2 className="mb-3 font-heading text-lg font-bold">Курсовка</h2>
@@ -220,11 +264,32 @@ export default async function AttendanceGroupPage({
                     {!isLockedToOtherTrainer && (
                       <input type="hidden" name="childId" value={child.id} />
                     )}
-                    <div>
-                      <p className="font-medium">
-                        {child.lastName} {child.firstName}
-                      </p>
-                      <p className="text-xs text-brand-text/50">{paymentLabel(child.paidUntil)}</p>
+                    <div className="min-w-[10rem] flex-1">
+                      <div className="flex items-start gap-2">
+                        <PaymentMark paid={paidCoversSession(child.paidUntil, date)} />
+                        <p className="min-w-0 break-words font-medium">
+                          {child.lastName} {child.firstName}
+                        </p>
+                      </div>
+                      {(() => {
+                        const debt = debtByChildId.get(child.id);
+                        const unpaid = debt?.unpaid ?? 0;
+                        return (
+                          <p className={`text-xs ${unpaid > 0 ? "text-red-300" : "text-brand-text/50"}`}>
+                            {paymentLabel(child.paidUntil, debt?.lastPresent ?? null)}
+                            {unpaid > 0 && (
+                              <span className="block font-medium">
+                                ходит без оплаты: {formatLessonsCount(unpaid)}
+                              </span>
+                            )}
+                          </p>
+                        );
+                      })()}
+                      {notifiedChildIds.has(child.id) && (
+                        <Badge tone="amber" className="mt-1">
+                          Родитель предупредил
+                        </Badge>
+                      )}
                     </div>
                     {isLockedToOtherTrainer ? (
                       <Badge tone="neutral">
@@ -234,7 +299,9 @@ export default async function AttendanceGroupPage({
                     ) : (
                       <AttendanceStatusPicker
                         name={`status-${child.id}`}
+                        childId={child.id}
                         defaultValue={record?.status}
+                        hasCourseResult={childIdsWithCourseResultToday.has(child.id)}
                       />
                     )}
                   </div>
@@ -247,6 +314,7 @@ export default async function AttendanceGroupPage({
           </div>
         </form>
       )}
+      </AttendanceStatusProvider>
 
       {workoffVisitors.length > 0 && (
         <div className="mt-6">
