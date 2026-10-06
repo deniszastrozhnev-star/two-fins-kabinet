@@ -45,30 +45,41 @@ export default async function MetricsPage({
     key === currentPeriod.key ? "/trainer/metrics" : `/trainer/metrics?period=${key}`;
 
   const instantRange = reportPeriodInstantRange(period);
-  const [groups, financeSettings, salaryRows, paymentsInPeriod, firstConfirmation] = await Promise.all([
+  const [groups, financeSettings, salaryRows, paymentsBySource, firstConfirmation] = await Promise.all([
     prisma.group.findMany({
       orderBy: [{ level: "asc" }, { name: "asc" }],
       include: { _count: { select: { children: true } } },
     }),
     getFinanceSettings(),
     computeSalaryReport(period.start, period.end),
-    prisma.paymentConfirmation.aggregate({
+    prisma.paymentConfirmation.groupBy({
+      by: ["source"],
       where: { paidAt: instantRange },
       _sum: { amountRub: true },
       _count: { _all: true, amountRub: true },
     }),
-    prisma.paymentConfirmation.aggregate({ _min: { paidAt: true } }),
+    // Начало реального учёта — первая оплата, записанная в момент подтверждения;
+    // дозаписанные задним числом (BACKFILL_TARIFF) носят историческую дату и
+    // начало учёта не определяют.
+    prisma.paymentConfirmation.aggregate({
+      where: { source: { not: "BACKFILL_TARIFF" } },
+      _min: { paidAt: true },
+    }),
   ]);
 
-  // Фактическая выручка — сумма подтверждённых оплат за период (сумма
-  // записывается в момент подтверждения, см. lib/payments.ts). Достоверна,
-  // только если учёт уже шёл к началу периода; до этого (и в период запуска
-  // учёта) выручка — оценка по текущему составу групп.
+  // Оборот — только сумма подтверждённых оплат периода (сумма пишется в момент
+  // подтверждения, см. lib/payments.ts); никаких оценок по составу групп.
+  // Дозаписанные задним числом (BACKFILL_TARIFF) суммы — тариф ребёнка, не
+  // фактический платёж, поэтому показываются отдельной строкой.
   const trackingStart = firstConfirmation._min.paidAt;
-  const hasFactRevenue = trackingStart != null && trackingStart.getTime() <= instantRange.gte.getTime();
-  const factRevenue = paymentsInPeriod._sum.amountRub ?? 0;
-  const paymentsCount = paymentsInPeriod._count._all;
-  const paymentsWithoutAmount = paymentsCount - paymentsInPeriod._count.amountRub;
+  const sumOf = (rows: typeof paymentsBySource) => rows.reduce((s, r) => s + (r._sum.amountRub ?? 0), 0);
+  const backfillRows = paymentsBySource.filter((r) => r.source === "BACKFILL_TARIFF");
+  const totalRevenue = sumOf(paymentsBySource);
+  const paymentsWithAmount = paymentsBySource.reduce((s, r) => s + r._count.amountRub, 0);
+  const paymentsWithoutAmount = paymentsBySource.reduce((s, r) => s + r._count._all - r._count.amountRub, 0);
+  const backfillCount = backfillRows.reduce((s, r) => s + r._count.amountRub, 0);
+  const backfillSum = sumOf(backfillRows);
+  const periodBeforeTracking = trackingStart == null || trackingStart.getTime() > instantRange.gte.getTime();
 
   const rows = groups.map((g) => ({
     id: g.id,
@@ -77,12 +88,7 @@ export default async function MetricsPage({
     childrenCount: g._count.children,
     capacity: g.capacity,
     pricePerMonth: g.pricePerMonth,
-    revenue:
-      g.pricePerMonth != null ? g._count.children * g.pricePerMonth : null,
   }));
-
-  const estimatedRevenue = rows.reduce((sum, r) => sum + (r.revenue ?? 0), 0);
-  const totalRevenue = hasFactRevenue ? factRevenue : estimatedRevenue;
 
   const monthlyRentRub = financeSettings.monthlyRentRub;
   const trainerSalariesTotal = salaryRows.reduce((sum, r) => sum + r.total, 0);
@@ -93,7 +99,7 @@ export default async function MetricsPage({
     <>
       <PageHeader
         title="Показатели"
-        description="Заполняемость и оценочная выручка по группам. Расчётный период начинается 25-го числа каждого месяца"
+        description="Заполняемость групп, оборот по подтверждённым оплатам и прибыль. Расчётный период начинается 25-го числа каждого месяца"
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -125,20 +131,14 @@ export default async function MetricsPage({
         )}
       </div>
 
-      {!hasFactRevenue && !isCurrent && (
+      {periodBeforeTracking && (
         <p className="mb-6 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          Зарплаты за этот период посчитаны точно — по записям посещаемости и
-          персональным тренировкам. Суммы оплат до{" "}
-          {trackingStart ? formatDateRu(trackingStart) : "начала учёта"} не
-          записывались, а состав групп на прошлые даты не хранится, поэтому
-          выручка и прибыль ниже — оценка по текущему составу групп и текущей
-          аренде.
-        </p>
-      )}
-      {hasFactRevenue && !isCurrent && (
-        <p className="mb-6 rounded-lg bg-white/5 px-4 py-3 text-sm text-brand-text/70">
-          Оборот — фактическая сумма оплат, подтверждённых в этом периоде;
-          зарплаты посчитаны по записям посещаемости. Аренда — текущая.
+          Суммы оплат записываются с{" "}
+          {trackingStart ? formatDateRu(trackingStart) : "первого подтверждения"}.
+          Оплаты этого периода, подтверждённые раньше, в оборот не входят, пока
+          их не дозаписали по тарифу, — поэтому оборот и прибыль ниже могут быть
+          занижены. Зарплаты посчитаны точно по записям посещаемости. Аренда —
+          текущая.
         </p>
       )}
 
@@ -151,7 +151,6 @@ export default async function MetricsPage({
                 <th className="px-4 py-3 font-medium sm:px-5">Уровень</th>
                 <th className="px-4 py-3 font-medium sm:px-5">Занятость</th>
                 <th className="px-4 py-3 font-medium sm:px-5">Тариф</th>
-                <th className="px-4 py-3 font-medium sm:px-5">Выручка</th>
               </tr>
             </thead>
             <tbody>
@@ -171,24 +170,9 @@ export default async function MetricsPage({
                       ? `${r.pricePerMonth.toLocaleString("ru-RU")}₽`
                       : "—"}
                   </td>
-                  <td className="px-4 py-3 font-semibold text-brand-cyan sm:px-5">
-                    {r.revenue != null
-                      ? `${r.revenue.toLocaleString("ru-RU")}₽`
-                      : "—"}
-                  </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr>
-                <td className="px-4 py-3 font-heading font-bold sm:px-5" colSpan={4}>
-                  Итого
-                </td>
-                <td className="px-4 py-3 font-heading font-bold text-brand-cyan sm:px-5">
-                  {totalRevenue.toLocaleString("ru-RU")}₽
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </CardBody>
       </Card>
@@ -198,19 +182,18 @@ export default async function MetricsPage({
         <CardBody className="flex flex-col divide-y divide-white/10 p-0">
           <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
             <div>
-              <p className="text-sm text-brand-text/70">
-                {hasFactRevenue ? "Оборот (факт: подтверждённые оплаты)" : "Оборот (оценка)"}
+              <p className="text-sm text-brand-text/70">Оборот (подтверждённые оплаты периода)</p>
+              <p className="mt-1 text-xs text-brand-text/50">
+                подтверждено {paymentsWithAmount} оплат на {totalRevenue.toLocaleString("ru-RU")}₽
               </p>
-              {hasFactRevenue && paymentsWithoutAmount > 0 && (
-                <p className="mt-1 text-xs text-amber-200/80">
-                  Ещё {paymentsWithoutAmount} оплат подтверждено без суммы (у ребёнка не было тарифа) — в оборот не вошли
+              {backfillCount > 0 && (
+                <p className="mt-0.5 text-xs text-amber-200/80">
+                  из них по тарифу, не фактическая сумма: {backfillCount} на {backfillSum.toLocaleString("ru-RU")}₽
                 </p>
               )}
-              {!hasFactRevenue && paymentsCount > 0 && (
-                <p className="mt-1 text-xs text-brand-text/50">
-                  Учёт сумм оплат ведётся с {trackingStart ? formatDateRu(trackingStart) : "—"}: подтверждено{" "}
-                  {paymentsCount} оплат на {factRevenue.toLocaleString("ru-RU")}₽ — со следующего периода оборот
-                  станет фактическим
+              {paymentsWithoutAmount > 0 && (
+                <p className="mt-0.5 text-xs text-amber-200/80">
+                  оплат без суммы: {paymentsWithoutAmount} (в оборот не вошли)
                 </p>
               )}
             </div>

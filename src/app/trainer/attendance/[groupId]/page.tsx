@@ -20,6 +20,28 @@ import { AttendanceStatusProvider, AttendancePresentCounter } from "@/components
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/labels";
 
+/** Покрывает ли оплата ДАТУ ЭТОГО занятия (а не сегодняшний день): занятие
+ * можно отмечать задним числом, и оплата, которая была действительна на ту
+ * дату, должна считаться оплатой. paidUntil и date — @db.Date, полночь UTC. */
+function paidCoversSession(paidUntil: Date | null, sessionDate: Date): boolean {
+  return paidUntil != null && paidUntil.getTime() >= sessionDate.getTime();
+}
+
+function PaymentMark({ paid }: { paid: boolean }) {
+  return (
+    <span
+      role="img"
+      aria-label={paid ? "Оплата покрывает это занятие" : "Оплаты на это занятие нет"}
+      title={paid ? "Оплата покрывает дату занятия" : "Нет оплаты на дату занятия"}
+      className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+        paid ? "bg-emerald-500/25 text-emerald-300" : "bg-red-500/25 text-red-300"
+      }`}
+    >
+      {paid ? "✓" : "✕"}
+    </span>
+  );
+}
+
 function paymentLabel(paidUntil: Date | null): string {
   if (!paidUntil) return "не оплачено";
   const status = getPaymentStatus(paidUntil);
@@ -241,10 +263,13 @@ export default async function AttendanceGroupPage({
                     {!isLockedToOtherTrainer && (
                       <input type="hidden" name="childId" value={child.id} />
                     )}
-                    <div>
-                      <p className="font-medium">
-                        {child.lastName} {child.firstName}
-                      </p>
+                    <div className="min-w-[10rem] flex-1">
+                      <div className="flex items-start gap-2">
+                        <PaymentMark paid={paidCoversSession(child.paidUntil, date)} />
+                        <p className="min-w-0 break-words font-medium">
+                          {child.lastName} {child.firstName}
+                        </p>
+                      </div>
                       <p className="text-xs text-brand-text/50">{paymentLabel(child.paidUntil)}</p>
                       {notifiedChildIds.has(child.id) && (
                         <Badge tone="amber" className="mt-1">

@@ -30,6 +30,33 @@ import { ConfirmSubmitButton } from "@/components/trainer/ConfirmSubmitButton";
 import { SaveButton } from "@/components/trainer/SaveButton";
 import { ReceiptTariffPrompt } from "@/components/trainer/ReceiptTariffPrompt";
 
+/** Текущая группа ребёнка одной строкой: название, дни и время, бассейн. */
+function CurrentGroupSummary({
+  group,
+  bare = false,
+}: {
+  group: { name: string; daysOfWeek: string[]; time: string; pool: string } | null;
+  bare?: boolean;
+}) {
+  const body = group ? (
+    <>
+      <p className="font-medium">{group.name}</p>
+      <p className="text-sm text-brand-text/60">
+        {group.daysOfWeek.join(", ")} · {group.time} · {group.pool}
+      </p>
+    </>
+  ) : (
+    <p className="font-medium text-brand-text/60">Без группы</p>
+  );
+  if (bare) return <div>{body}</div>;
+  return (
+    <div className="mb-4 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5">
+      <p className="mb-1 text-xs uppercase tracking-wide text-brand-text/50">Группа</p>
+      {body}
+    </div>
+  );
+}
+
 export default async function ChildDetailPage({
   params,
 }: {
@@ -100,6 +127,12 @@ export default async function ChildDetailPage({
   const payment = getPaymentStatus(child.paidUntil);
   const tariffRub = await getChildTariffRub(child.id);
   const medicalStatus = getMedicalStatus(certificates[0]?.validUntil ?? null);
+  const currentGroup = groups.find((g) => g.id === child.groupId) ?? null;
+  // Конструктор группы на карточке стоит в двух местах (рядом с ФИО и в блоке
+  // оплаты) — у каждого своё локальное состояние выбора. После сохранения в
+  // одном из них ключ меняется, и второй пересоздаётся с актуальной группой,
+  // иначе его устаревший выбор можно было бы сохранить поверх нового.
+  const groupFormKey = `${child.groupId ?? "none"}:${extraSessions[0]?.groupId ?? "none"}`;
 
   return (
     <>
@@ -134,6 +167,7 @@ export default async function ChildDetailPage({
               <h2 className="mb-4 font-heading text-lg font-bold">
                 Данные ребёнка
               </h2>
+              <CurrentGroupSummary group={currentGroup} />
               <ChildForm
                 action={updateChildAction}
                 groups={groups}
@@ -155,6 +189,7 @@ export default async function ChildDetailPage({
             <CardBody>
               <h2 className="mb-3 font-heading text-lg font-bold">Группа и доп. занятие</h2>
               <ChildGroupForm
+                key={groupFormKey}
                 childId={child.id}
                 groups={groups}
                 currentGroupId={child.groupId}
@@ -185,6 +220,24 @@ export default async function ChildDetailPage({
                   <input type="hidden" name="id" value={child.id} />
                   <Button type="submit">Оплачено</Button>
                 </form>
+              </div>
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <p className="mb-2 text-sm text-brand-text/60">Группа</p>
+                <CurrentGroupSummary group={currentGroup} bare />
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-brand-cyan">
+                    Сменить группу
+                  </summary>
+                  <div className="mt-3">
+                    <ChildGroupForm
+                      key={groupFormKey}
+                      childId={child.id}
+                      groups={groups}
+                      currentGroupId={child.groupId}
+                      currentExtraGroupId={extraSessions[0]?.groupId ?? null}
+                    />
+                  </div>
+                </details>
               </div>
               <div className="mt-4 border-t border-white/10 pt-4">
                 <p className="text-sm text-brand-text/60">Остаток отработок</p>

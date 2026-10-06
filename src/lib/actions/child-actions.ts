@@ -9,7 +9,7 @@ import { normalizePhone } from "@/lib/phone";
 import { parseDateInputValue } from "@/lib/dates";
 import { assignOrWaitlist } from "@/lib/waitlist";
 import { sendPaymentAcceptedPush } from "@/lib/push";
-import { recordPaymentConfirmation } from "@/lib/payments";
+import { recordPaymentConfirmation, resolvePendingReceipts } from "@/lib/payments";
 
 function readChildFields(formData: FormData) {
   const lastName = String(formData.get("lastName") ?? "").trim();
@@ -101,6 +101,7 @@ export async function updateChildAction(
       source: "DATE_EDIT",
       trainerId: trainer.id,
     });
+    await resolvePendingReceipts(id);
   }
   if (paidUntilChanged && data.paidUntil) {
     await sendPaymentAcceptedPush(updated, data.paidUntil).catch((err) =>
@@ -121,6 +122,7 @@ export async function markPaidAction(formData: FormData) {
     data: { paidUntil },
   });
   await recordPaymentConfirmation({ childId: id, paidUntil, source: "MARK_PAID", trainerId: trainer.id });
+  await resolvePendingReceipts(id);
   revalidatePath("/trainer/children");
   revalidatePath(`/trainer/children/${id}`);
   revalidatePath("/parent", "layout");

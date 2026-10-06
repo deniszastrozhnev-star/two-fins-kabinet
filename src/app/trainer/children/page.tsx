@@ -11,6 +11,29 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/Button";
 import { ChildrenList, type ChildListItem } from "@/components/trainer/ChildrenList";
 
+const PENDING_VISIBLE = 8;
+
+function PendingReceiptRow({
+  row,
+}: {
+  row: { id: string; name: string; latest: Date; count: number };
+}) {
+  return (
+    <li>
+      <Link
+        href={`/trainer/children/${row.id}`}
+        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 hover:bg-white/5"
+      >
+        <span className="min-w-0 break-words font-medium">{row.name}</span>
+        <span className="text-xs text-brand-text/60">
+          чек от {formatDateRu(row.latest)}
+          {row.count > 1 ? ` · всего ${row.count}` : ""}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 export default async function ChildrenPage() {
   const trainer = await requireTrainer();
 
@@ -54,11 +77,19 @@ export default async function ChildrenPage() {
   const duplicateClusters = [...duplicateGroupsByKey.values()].filter((g) => g.length > 1);
   const duplicateChildIds = new Set(duplicateClusters.flat().map((c) => c.id));
 
-  const [balances, unviewedReceipts, certificates, contracts] = await Promise.all([
+  const [balances, unviewedReceipts, pendingReceipts, certificates, contracts] = await Promise.all([
     getWorkoffBalances(children.map((c) => c.id)),
     prisma.paymentReceipt.findMany({
       where: { childId: { in: children.map((c) => c.id) }, viewedAt: null },
       select: { childId: true },
+    }),
+    // Чек загружен, но тренер ещё не подтвердил оплату (resolvedAt пуст) —
+    // даже если карточку уже открывали (viewedAt не пуст): работа с чеком не
+    // закончена. Идёт в отдельный блок наверху, порядок основного списка не трогаем.
+    prisma.paymentReceipt.findMany({
+      where: { resolvedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { childId: true, createdAt: true },
     }),
     prisma.medicalCertificate.findMany({
       where: { childId: { in: children.map((c) => c.id) } },
@@ -71,6 +102,21 @@ export default async function ChildrenPage() {
     }),
   ]);
   const childrenWithNewReceipt = new Set(unviewedReceipts.map((r) => r.childId));
+
+  // Один ребёнок — одна строка блока: дата самого свежего неподтверждённого чека
+  // (pendingReceipts уже отсортирован от новых к старым) и сколько их всего.
+  const childById = new Map(children.map((c) => [c.id, c]));
+  const pendingByChild = new Map<string, { latest: Date; count: number }>();
+  for (const r of pendingReceipts) {
+    if (!childById.has(r.childId)) continue;
+    const entry = pendingByChild.get(r.childId);
+    if (entry) entry.count += 1;
+    else pendingByChild.set(r.childId, { latest: r.createdAt, count: 1 });
+  }
+  const pendingRows = [...pendingByChild.entries()].map(([childId, info]) => {
+    const c = childById.get(childId)!;
+    return { id: childId, name: `${c.lastName} ${c.firstName}`, ...info };
+  });
   const latestValidUntilByChild = new Map<string, Date>();
   for (const cert of certificates) {
     if (!latestValidUntilByChild.has(cert.childId)) {
@@ -150,6 +196,33 @@ export default async function ChildrenPage() {
                 </div>
               ))}
             </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {pendingRows.length > 0 && (
+        <Card className="mb-5 border-brand-violet/30 bg-brand-violet/10">
+          <CardBody>
+            <h2 className="mb-3 font-heading text-base font-bold">
+              Чеки на проверке ({pendingRows.length})
+            </h2>
+            <ul className="flex flex-col divide-y divide-white/10">
+              {pendingRows.slice(0, PENDING_VISIBLE).map((r) => (
+                <PendingReceiptRow key={r.id} row={r} />
+              ))}
+            </ul>
+            {pendingRows.length > PENDING_VISIBLE && (
+              <details className="mt-1">
+                <summary className="cursor-pointer py-2 text-sm text-brand-cyan">
+                  Показать ещё {pendingRows.length - PENDING_VISIBLE}
+                </summary>
+                <ul className="flex flex-col divide-y divide-white/10">
+                  {pendingRows.slice(PENDING_VISIBLE).map((r) => (
+                    <PendingReceiptRow key={r.id} row={r} />
+                  ))}
+                </ul>
+              </details>
+            )}
           </CardBody>
         </Card>
       )}
