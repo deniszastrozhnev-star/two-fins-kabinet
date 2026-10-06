@@ -22,6 +22,11 @@ import crypto from "node:crypto";
 import pg from "pg";
 import { computeCombinedPrice } from "../src/lib/registrationTariffs.ts";
 
+// Время в базе хранится как UTC без указания зоны, а драйвер разбирает его в
+// зоне машины, где запущен скрипт, — из-за этого границы окна «съезжали» бы на
+// разницу с UTC. Фиксируем UTC, чтобы результат не зависел от компьютера.
+process.env.TZ = "UTC";
+
 const NSK_OFFSET_MS = 7 * 60 * 60 * 1000;
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
@@ -114,7 +119,7 @@ console.log(`  с суммой по тарифу: ${withAmount.length} на ${wi
 console.log(`  без суммы (у ребёнка нет группы/тарифа): ${rows.length - withAmount.length}`);
 for (const r of rows) {
   console.log(
-    `  ${day(r.paidAt)}  ${r.name}  срок до ${day(r.paidUntil)}  ${r.amountRub != null ? r.amountRub + "₽ (по тарифу)" : "без суммы"}`,
+    `  ${day(new Date(r.paidAt.getTime() + NSK_OFFSET_MS))}  ${r.name}  срок до ${day(r.paidUntil)}  ${r.amountRub != null ? r.amountRub + "₽ (по тарифу)" : "без суммы"}`,
   );
 }
 

@@ -15,6 +15,11 @@
 // Откат: update "PaymentReceipt" set "resolvedAt" = null where "resolvedAt" = "createdAt";
 import pg from "pg";
 
+// Время в базе хранится как UTC без указания зоны, а драйвер разбирает его в
+// зоне машины, где запущен скрипт, — из-за этого границы окна «съезжали» бы на
+// разницу с UTC. Фиксируем UTC, чтобы результат не зависел от компьютера.
+process.env.TZ = "UTC";
+
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const before = args.find((a) => a.startsWith("--before="))?.split("=")[1];
